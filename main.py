@@ -6,12 +6,15 @@ import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime
 
-# Export directory
-EXPORT_DIR = r"g:\TMAuto\exports"
+# Base directory (wherever this script lives)
+BASE_DIR = Path(__file__).parent.resolve()
+
+# Export directory — lives next to the script
+EXPORT_DIR = str(BASE_DIR / "export")
 os.makedirs(EXPORT_DIR, exist_ok=True)
 
 # Google Sheets configuration
-SHEET_ID = "1YrrqKaeslySq565uwKOzEQJKEVzVmASzNmOn8yx0W-s"
+SHEET_ID = "1Hiqcudjg-rqcm0kC-EvJv5vZeYjK3AngiS91lYmrbkY"
 SHEET_NAME = "List"
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
 
@@ -227,9 +230,12 @@ def process_directory(base_path, prefix_to_remove, max_records=None):
     return records
 
 def get_google_sheets_client():
-    """Initialize Google Sheets client"""
+    """Initialize Google Sheets client using credentials.json next to this script"""
     try:
-        creds_path = "g:\\TMAuto\\credentials.json"
+        creds_path = str(BASE_DIR / "credentials.json")
+        if not os.path.exists(creds_path):
+            print(f"❌ credentials.json not found at: {creds_path}")
+            return None
         creds = Credentials.from_service_account_file(creds_path, scopes=SCOPES)
         client = gspread.authorize(creds)
         return client
@@ -400,7 +406,7 @@ def export_local(records, filename_prefix):
 def show_menu():
     """Display menu options"""
     print("\n" + "="*60)
-    print("    🗂️  GOOGLE DRIVE PARSER WITH PATTERN MATCHING 🗂️")
+    print("    🗂️  DRIVE FOLDERS LIST — Pattern Matcher 🗂️")
     print("="*60)
     print("1. 📁 ALL CLIENTS")
     print("2. 📁 CONSULTANTS")

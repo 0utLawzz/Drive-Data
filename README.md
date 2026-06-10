@@ -1,58 +1,77 @@
-# 🎬 Drive-Data Parser
+# 🗂️ Drive Folders List
+
+> **A smart Google Drive folder parser that extracts, categorizes, and exports trademark case data to Google Sheets or local Excel/CSV files.**
 
 ---
 
-# Description
-
-**Drive-Data** is a Python-based command-line utility for parsing Google Drive folder structures and extracting structured trademark case information. It intelligently scans directory trees to identify and categorize trademark documents (TM-1, TM-48, EXAM, ACK, etc.) using pattern matching. The parsed data can be uploaded directly to Google Sheets via service account credentials or exported locally to Excel and CSV formats.
-
----
-
-# 🚀 Features
-
-- **Directory Parsing:** Recursively parses client and consultant folder structures from Google Drive (or local mirrors).
-- **Pattern Matching:** Automatically detects and categorizes trademark documents into standardized categories (TM-1, TM-48, EXAM, ACK, etc.).
-- **Google Sheets Upload:** Pushes parsed data directly into a Google Sheet using service account authentication with duplicate control.
-- **Local Export:** Exports results to Excel (`.xlsx`) and CSV files in a configurable export directory.
-- **Quick Export Mode:** Fast export without deep pattern matching for rapid reporting.
-- **Batch Processing:** Supports processing a specific number of records for testing and validation.
-- **Interactive Menu:** CLI menu system for selecting directory scope and upload target.
+![Python](https://img.shields.io/badge/Python-3.x-blue?logo=python&logoColor=white)
+![Google Sheets](https://img.shields.io/badge/Google%20Sheets-API-green?logo=google-sheets&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-yellow)
+![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux-lightgrey)
+![Status](https://img.shields.io/badge/Status-Active-brightgreen)
 
 ---
 
-# 🛠️ Tech Stack
+## 📖 Description
+
+**Drive Folders List** is a Python command-line tool designed for trademark law firms and IP professionals. It scans Google Drive–mirrored folder structures (organized by client and case), extracts structured information from folder names, and automatically detects trademark document types (TM-1, TM-48, EXAM, ACK, etc.) using pattern matching.
+
+Results can be pushed directly to a **Google Sheet** via a service account, or exported locally to **Excel (.xlsx)** and **CSV** files — with full duplicate prevention built in.
+
+### 🏷️ Tags
+
+`google-drive` · `google-sheets` · `trademark` · `ip-management` · `folder-parser` · `python` · `automation` · `pattern-matching` · `pandas` · `gspread` · `cli-tool` · `excel-export` · `service-account` · `data-extraction` · `file-scanner`
+
+---
+
+## 🚀 Features
+
+- 📁 **Folder Structure Parsing** — Recursively scans client/consultant directories and extracts client numbers, case IDs, TM numbers, and class codes from folder names.
+- 🔍 **Pattern Matching** — Automatically detects and categorizes trademark documents (TM-1, TM-48, EXAM, ACK, Certificates, etc.) using regex rules.
+- ☁️ **Google Sheets Upload** — Pushes data directly to a Google Sheet using service account credentials with **automatic duplicate control**.
+- 💾 **Local Export** — Saves results as `.xlsx` and `.csv` into a configurable export directory.
+- ⚡ **Quick Export Mode** — Rapid export without deep pattern matching for fast reporting.
+- 🔢 **Batch Limiting** — Optionally cap the number of records processed for testing.
+- 🖥️ **Interactive CLI Menu** — Simple numbered menu to pick directories and upload targets.
+
+---
+
+## 🛠️ Tech Stack
 
 | Layer | Technology |
 | --- | --- |
 | **Language** | Python 3.x |
 | **Data Manipulation** | `pandas`, `openpyxl` |
 | **Google Integration** | `gspread`, `google-auth` |
+| **File I/O** | `pathlib`, `os` |
+| **Pattern Matching** | `re` (regex) |
 
 ---
 
-# 📂 Project Structure
+## 📂 Project Structure
 
 ```text
 Drive-Data/
-├── main.py              # Main CLI application — directory parsing, pattern matching, export logic
+├── main.py              # Core CLI: directory parsing, pattern matching, export logic
 ├── requirements.txt     # Python dependencies
-├── credentials.json     # Google Service Account credentials (gitignored)
-├── exports/             # Exported Excel/CSV files (gitignored)
-└── README.md            # Documentation
+├── credentials.json     # Google Service Account key (gitignored — do NOT commit)
+├── export/              # Auto-created output directory for Excel/CSV files
+└── README.md            # This documentation
 ```
 
 ---
 
-# 📄 Important Files
+## 📄 Key Files
 
 | File | Purpose |
 | --- | --- |
-| `main.py` | The entire business logic: directory traversal, regex pattern matching, Google Sheets integration, and CLI menu. |
-| `credentials.json` | Google Cloud service account key. **Never commit this file to source control.** |
+| `main.py` | Full application logic: traversal, regex matching, Google Sheets auth, CLI menu |
+| `credentials.json` | Google Cloud service account JSON key — place in project root, **never commit** |
+| `requirements.txt` | Python package dependencies |
 
 ---
 
-# 🏗️ Architecture Diagram
+## 🏗️ Architecture
 
 ```mermaid
 graph TD
@@ -69,7 +88,7 @@ graph TD
 
 ---
 
-# 🔄 Processing / Data Flow
+## 🔄 Data Flow
 
 ```mermaid
 flowchart LR
@@ -81,90 +100,113 @@ flowchart LR
     CheckDuplicates --> ExportChoice
     ExportChoice -->|Local| SaveExcel
     ExportChoice -->|Cloud| UploadSheets
+    ExportChoice -->|Both| SaveExcel & UploadSheets
 ```
 
 ---
 
-# 📥 Inputs
-
-- **Directory Paths:** Google Drive folder paths (configurable in `main.py`).
-- **Pattern Definitions:** Document category regex patterns embedded in the script.
-- **Credentials:** Google Service Account JSON for Sheets API authentication.
-
----
-
-# 📤 Outputs
-
-- **Google Sheets:** Structured spreadsheet with trademark case rows per client/consultant.
-- **Excel File:** `.xlsx` export inside `exports/` directory.
-- **CSV File:** Flat `.csv` alternative export.
-
----
-
-# 🏎️ Quick Start
+## 🏎️ Quick Start
 
 ```bash
-# Install dependencies
+# 1. Clone the repo
+git clone https://github.com/0utLawzz/Drive-Data.git
+cd Drive-Data
+
+# 2. Install dependencies
 pip install -r requirements.txt
 
-# Place your credentials.json in the project root
-# Configure SHEET_ID, SHEET_NAME, EXPORT_DIR in main.py
+# 3. Place your credentials.json in the project root
+#    (Google Cloud service account key with Sheets + Drive access)
 
-# Run the tool
+# 4. Configure your Google Sheet ID and folder paths in main.py
+#    SHEET_ID = "your_google_sheet_id"
+#    consultants_path = r"path\to\2 CONSULTANTS"
+#    clients_path = r"path\to\1 ALL CLIENTS"
+
+# 5. Run
 python main.py
 ```
 
 ---
 
-# ⚙️ Configuration
+## ⚙️ Configuration
 
 Edit these constants at the top of `main.py`:
+
 ```python
-SHEET_ID = "your_google_sheet_id"
-SHEET_NAME = "List"
-EXPORT_DIR = r"path\to\exports"
+SHEET_ID   = "your_google_sheet_id"   # Google Sheet ID from the URL
+SHEET_NAME = "List"                   # Target worksheet tab name
 ```
 
+And update the folder paths inside `main()`:
+
+```python
+consultants_path = r"F:\YourDrive\2 CONSULTANTS"
+clients_path     = r"F:\YourDrive\1 ALL CLIENTS"
+```
+
+> **Note:** `credentials.json` is auto-located from the same directory as `main.py` — no hardcoded path needed.
+
 ---
 
-# 🎯 Pattern Categories
+## 🎯 Pattern Categories
 
-| Category | Document Type |
+| Column | Document Type Detected |
 | --- | --- |
 | `TM-1` | Trademark application forms |
-| `TM-48` | Trademark registration certificates |
-| `EXAM` | Examination reports and showcase notices |
+| `TM-48` | Registration / updated registration docs |
+| `EXAM` | Examination reports, showcase notices, replies |
 | `ACK` | Acknowledgment receipts |
-| `ACCEPTANCE` | Acceptance documents |
+| `ACCEPTANCE` | Acceptance / complete file documents |
 | `D-NOTE` | Demand notes (TM-11) |
-| `TM-16` | Trademark renewal documents |
-| `TM-50` | Trademark opposition documents |
-| `TM-06` | Other trademark forms |
-| `COMPANY` | Board resolutions |
+| `TM-16` | Renewal documents |
+| `TM-50` | Opposition documents |
+| `TM-06` | Other IPO trademark forms |
+| `COMPANY` | Board of resolution documents |
 | `OPPO` | Withdrawn letters |
-| `PUB` | Publication documents |
-| `CERTIFICATE` | Trademark certificates |
+| `PUB` | Publication records |
+| `CERTIFICATE` | Trademark certificates (original / renewal) |
 
 ---
 
-# 🔒 Security Notes
+## 📥 Inputs
 
-- **credentials.json** is in `.gitignore`. Never commit service account keys to repositories.
-- Limit the service account's Google Drive and Sheets permissions to the minimum required scope.
-
----
-
-# 🚧 Roadmap
-
-- Add a GUI (Tkinter or web) to replace the CLI menu.
-- Implement automatic scheduling via cron/Task Scheduler for nightly syncs.
-- Add email notifications on completion or error.
+- **Folder Paths** — Local mirrors of Google Drive folders (configurable in `main.py`)
+- **Pattern Definitions** — Regex rules embedded per document category
+- **credentials.json** — Google Service Account key for Sheets API
 
 ---
 
-# 📝 License
+## 📤 Outputs
 
-MIT License
+| Output | Format | Location |
+| --- | --- | --- |
+| Google Sheets | Live spreadsheet | Configured `SHEET_ID` |
+| Excel | `.xlsx` | `export/` directory |
+| CSV | `.csv` | `export/` directory |
+
+---
+
+## 🔒 Security Notes
+
+- `credentials.json` is listed in `.gitignore` and **must never be committed**.
+- The service account should only have scopes for `spreadsheets` and `drive` — no broader permissions.
+- Rotate the service account key periodically via Google Cloud Console.
+
+---
+
+## 🚧 Roadmap
+
+- [ ] Add a GUI (Tkinter or web-based) to replace the CLI menu
+- [ ] Implement automatic scheduling via Windows Task Scheduler or cron
+- [ ] Add email/Slack notifications on completion or error
+- [ ] Support multi-sheet output (one sheet per client)
+
+---
+
+## 📝 License
+
+MIT License © OutLawZ™
 
 ---
 
@@ -172,12 +214,9 @@ MIT License
 
 **By OutLawZ™**
 
-Website: https://www.brandex.pk
-
-Contact:
-
+🌐 Website: [brandex.pk](https://www.brandex.pk)
 📧 Email: net2tara@gmail.com
-🌐 Website: https://www.brandex.pk
 
 ---
-Made with ❤️ by OutLawZ™
+
+*Made with ❤️ by OutLawZ™*
