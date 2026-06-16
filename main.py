@@ -243,21 +243,54 @@ def get_google_sheets_client():
         print(f"Error connecting to Google Sheets: {e}")
         return None
 
-def get_existing_tm_numbers(sheet):
-    """Get existing TM numbers from sheet to avoid duplicates"""
+def _make_record_key(client_number, case_no, tm_no, class_code):
+    """Build a composite unique key for a record.
+    Falls back to (client_number, case_no, class_code) when TM NO is blank
+    so blank-TM records are still deduplicated correctly."""
+    tm = str(tm_no).strip()
+    cn = str(client_number).strip()
+    ca = str(case_no).strip()
+    cl = str(class_code).strip()
+    if tm:
+        return (cn, ca, tm, cl)
+    # Fallback key for records without a TM number
+    return (cn, ca, '__NO_TM__', cl)
+
+
+def get_existing_keys(sheet):
+    """Get composite unique keys already in the sheet to avoid duplicates.
+    Strips emoji prefixes from column headers (e.g. '🔢 TM NO' → 'TM NO')
+    so the lookup works regardless of how headers are formatted."""
     try:
         worksheet = sheet.worksheet(SHEET_NAME)
-        records = worksheet.get_all_records()
-        tm_numbers = set()
-        
+        raw_records = worksheet.get_all_records()
+
+        # Normalize header keys: drop leading emoji + whitespace
+        import unicodedata
+        def strip_emoji(text):
+            """Remove leading non-ASCII / emoji characters and surrounding whitespace."""
+            cleaned = ''.join(ch for ch in str(text)
+                              if unicodedata.category(ch) not in ('So', 'Sm', 'Sk', 'Sc'))
+            return cleaned.strip()
+
+        records = []
+        for raw in raw_records:
+            records.append({strip_emoji(k): v for k, v in raw.items()})
+
+        existing_keys = set()
         for record in records:
-            tm_col = record.get('TM NO', '')
-            if tm_col and tm_col.strip():
-                tm_numbers.add(tm_col.strip())
-        
-        return tm_numbers
+            key = _make_record_key(
+                record.get('CLIENT NUMBER', ''),
+                record.get('CASE #', ''),
+                record.get('TM NO', ''),
+                record.get('CLASS', '')
+            )
+            existing_keys.add(key)
+
+        print(f"   🔍 Found {len(existing_keys)} existing records in sheet")
+        return existing_keys
     except Exception as e:
-        print(f"Error getting existing TM numbers: {e}")
+        print(f"Error getting existing keys: {e}")
         return set()
 
 def setup_sheet_headers(sheet):
@@ -313,19 +346,30 @@ def upload_to_sheets(records, sheet_id=SHEET_ID):
         if not worksheet:
             return False
         
-        # Get existing TM numbers
-        existing_tm_numbers = get_existing_tm_numbers(sheet)
-        
-        # Filter out duplicates
+        # Get composite keys already in the sheet
+        existing_keys = get_existing_keys(sheet)
+
+        # Filter out duplicates using composite key
         new_records = []
+        skipped = []
         for record in records:
-            tm_no = record.get('TM NO', '').strip()
-            if tm_no and tm_no not in existing_tm_numbers:
+            key = _make_record_key(
+                record.get('CLIENT NUMBER', ''),
+                record.get('CASE #', ''),
+                record.get('TM NO', ''),
+                record.get('CLASS', '')
+            )
+            if key in existing_keys:
+                skipped.append(record)
+            else:
                 new_records.append(record)
-                existing_tm_numbers.add(tm_no)
-        
+                existing_keys.add(key)  # prevent within-batch duplicates too
+
+        if skipped:
+            print(f"⚠️  Skipped {len(skipped)} duplicate(s) — already in sheet")
+
         if not new_records:
-            print("No new records to upload (all duplicates filtered)")
+            print("✅ No new records to upload (all already exist in sheet)")
             return True
         
         # Prepare data for upload
@@ -368,38 +412,51 @@ def upload_to_sheets(records, sheet_id=SHEET_ID):
         return False
 
 def export_local(records, filename_prefix):
-    """Export data to local Excel and CSV files"""
+    """Export data to local Excel and CSV files, with duplicate deduplication."""
     if not records:
         print("No records to export!")
         return
-    
+
     df = pd.DataFrame(records)
     columns = [
-        "CLIENT NUMBER", "CLIENT NAME", "CASE #", "CASE NAME", "TM NO", "CLASS", 
-        "FILES", "EXT", "TM-1", "TM-48", "EXAM", "ACK", "ACCEPTANCE", "D-NOTE", 
+        "CLIENT NUMBER", "CLIENT NAME", "CASE #", "CASE NAME", "TM NO", "CLASS",
+        "FILES", "EXT", "TM-1", "TM-48", "EXAM", "ACK", "ACCEPTANCE", "D-NOTE",
         "TM-16", "TM-50", "TM-06", "COMPANY", "OPPO", "PUB", "CERTIFICATE", "DATE ADDED"
     ]
     df = df[columns]
-    
+
+    # ── Deduplicate on composite key (CLIENT NUMBER + CASE # + TM NO + CLASS)
+    # For blank TM NO, treat each (CLIENT NUMBER, CASE #, CLASS) combo as unique.
+    before = len(df)
+    df['_key'] = df.apply(
+        lambda r: _make_record_key(
+            r['CLIENT NUMBER'], r['CASE #'], r['TM NO'], r['CLASS']
+        ), axis=1
+    )
+    df = df.drop_duplicates(subset='_key').drop(columns='_key')
+    dupes_removed = before - len(df)
+    if dupes_removed:
+        print(f"⚠️  Removed {dupes_removed} duplicate(s) from local export")
+
     # Short file names
     short_names = {
         "consultants_data": "cons_patterns",
-        "clients_data": "clients_patterns", 
+        "clients_data": "clients_patterns",
         "all_data": "all_patterns",
         "custom_data": "custom_patterns"
     }
-    
+
     short_name = short_names.get(filename_prefix, filename_prefix)
-    
+
     # Export to Excel
     excel_file = os.path.join(EXPORT_DIR, f"{short_name}.xlsx")
     df.to_excel(excel_file, index=False, engine='openpyxl')
-    
+
     # Export to CSV
     csv_file = os.path.join(EXPORT_DIR, f"{short_name}.csv")
     df.to_csv(csv_file, index=False)
-    
-    print(f"💾 Exported {len(records)} records locally:")
+
+    print(f"💾 Exported {len(df)} records locally:")
     print(f"   📊 Excel: {excel_file}")
     print(f"   📄 CSV: {csv_file}")
 
