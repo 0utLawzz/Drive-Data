@@ -243,55 +243,6 @@ def get_google_sheets_client():
         print(f"Error connecting to Google Sheets: {e}")
         return None
 
-def _make_record_key(client_number, case_no, tm_no, class_code):
-    """Build a composite unique key for a record.
-    Falls back to (client_number, case_no, class_code) when TM NO is blank
-    so blank-TM records are still deduplicated correctly."""
-    tm = str(tm_no).strip()
-    cn = str(client_number).strip()
-    ca = str(case_no).strip()
-    cl = str(class_code).strip()
-    if tm:
-        return (cn, ca, tm, cl)
-    # Fallback key for records without a TM number
-    return (cn, ca, '__NO_TM__', cl)
-
-
-def get_existing_keys(sheet):
-    """Get composite unique keys already in the sheet to avoid duplicates.
-    Strips emoji prefixes from column headers (e.g. '🔢 TM NO' → 'TM NO')
-    so the lookup works regardless of how headers are formatted."""
-    try:
-        worksheet = sheet.worksheet(SHEET_NAME)
-        raw_records = worksheet.get_all_records()
-
-        # Normalize header keys: drop leading emoji + whitespace
-        import unicodedata
-        def strip_emoji(text):
-            """Remove leading non-ASCII / emoji characters and surrounding whitespace."""
-            cleaned = ''.join(ch for ch in str(text)
-                              if unicodedata.category(ch) not in ('So', 'Sm', 'Sk', 'Sc'))
-            return cleaned.strip()
-
-        records = []
-        for raw in raw_records:
-            records.append({strip_emoji(k): v for k, v in raw.items()})
-
-        existing_keys = set()
-        for record in records:
-            key = _make_record_key(
-                record.get('CLIENT NUMBER', ''),
-                record.get('CASE #', ''),
-                record.get('TM NO', ''),
-                record.get('CLASS', '')
-            )
-            existing_keys.add(key)
-
-        print(f"   🔍 Found {len(existing_keys)} existing records in sheet")
-        return existing_keys
-    except Exception as e:
-        print(f"Error getting existing keys: {e}")
-        return set()
 
 def setup_sheet_headers(sheet):
     """Setup headers with emojis"""
@@ -335,7 +286,7 @@ def setup_sheet_headers(sheet):
         return None
 
 def upload_to_sheets(records, sheet_id=SHEET_ID):
-    """Upload records to Google Sheets with duplicate control"""
+    """Upload records to Google Sheets"""
     client = get_google_sheets_client()
     if not client:
         return False
@@ -346,30 +297,10 @@ def upload_to_sheets(records, sheet_id=SHEET_ID):
         if not worksheet:
             return False
         
-        # Get composite keys already in the sheet
-        existing_keys = get_existing_keys(sheet)
-
-        # Filter out duplicates using composite key
-        new_records = []
-        skipped = []
-        for record in records:
-            key = _make_record_key(
-                record.get('CLIENT NUMBER', ''),
-                record.get('CASE #', ''),
-                record.get('TM NO', ''),
-                record.get('CLASS', '')
-            )
-            if key in existing_keys:
-                skipped.append(record)
-            else:
-                new_records.append(record)
-                existing_keys.add(key)  # prevent within-batch duplicates too
-
-        if skipped:
-            print(f"⚠️  Skipped {len(skipped)} duplicate(s) — already in sheet")
+        new_records = records
 
         if not new_records:
-            print("✅ No new records to upload (all already exist in sheet)")
+            print("✅ No records to upload")
             return True
         
         # Prepare data for upload
@@ -403,8 +334,7 @@ def upload_to_sheets(records, sheet_id=SHEET_ID):
         
         # Append new records
         worksheet.append_rows(data)
-        print(f"✅ Uploaded {len(new_records)} new records to Google Sheets")
-        print(f"📊 Filtered out {len(records) - len(new_records)} duplicates")
+        print(f"✅ Uploaded {len(new_records)} records to Google Sheets")
         return True
         
     except Exception as e:
@@ -412,7 +342,7 @@ def upload_to_sheets(records, sheet_id=SHEET_ID):
         return False
 
 def export_local(records, filename_prefix):
-    """Export data to local Excel and CSV files, with duplicate deduplication."""
+    """Export data to local Excel and CSV files."""
     if not records:
         print("No records to export!")
         return
@@ -425,18 +355,6 @@ def export_local(records, filename_prefix):
     ]
     df = df[columns]
 
-    # ── Deduplicate on composite key (CLIENT NUMBER + CASE # + TM NO + CLASS)
-    # For blank TM NO, treat each (CLIENT NUMBER, CASE #, CLASS) combo as unique.
-    before = len(df)
-    df['_key'] = df.apply(
-        lambda r: _make_record_key(
-            r['CLIENT NUMBER'], r['CASE #'], r['TM NO'], r['CLASS']
-        ), axis=1
-    )
-    df = df.drop_duplicates(subset='_key').drop(columns='_key')
-    dupes_removed = before - len(df)
-    if dupes_removed:
-        print(f"⚠️  Removed {dupes_removed} duplicate(s) from local export")
 
     # Short file names
     short_names = {

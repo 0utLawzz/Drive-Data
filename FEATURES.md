@@ -8,7 +8,7 @@
 
 ## Data Quality Features
 
-- **Duplicate Prevention:** Before uploading to Google Sheets, the tool fetches existing records and computes a unique composite key per row to avoid re-inserting known data.
+- **Unfiltered Exports:** All discovered records are uploaded directly to Google Sheets and saved to CSV/Excel without any duplicate filtering, ensuring complete and exhaustive records.
 - **Quick Export Mode:** A fast-path option that exports raw directory listings without pattern matching, for rapid auditing.
 
 ## Batch & Testing Features

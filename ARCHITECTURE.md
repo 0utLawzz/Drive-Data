@@ -15,7 +15,7 @@
 
 ### 3. Export Layer
 - **Local:** Converts the list to a `pandas` DataFrame and exports via `openpyxl` to `.xlsx` and `.csv`.
-- **Google Sheets:** Uses `gspread` with Google Service Account authentication to fetch existing sheet rows, compute a de-duplication key, and append only new records.
+- **Google Sheets:** Uses `gspread` with Google Service Account authentication to append all processed records directly to the sheet.
 
 ## Data Flow Diagram
 
@@ -25,9 +25,7 @@ graph TD
     Menu --> Scanner[os.walk Directory Traversal]
     Scanner --> Matcher[Regex Pattern Matcher]
     Matcher --> Builder[pandas DataFrame Builder]
-    Builder -->|Dedup Check| DupCheck{Duplicate?}
-    DupCheck -->|New Record| Append[Append to Output]
-    DupCheck -->|Exists| Skip[Skip Record]
+    Builder --> Append[Append to Output]
     Append -->|Local Export| Excel[Excel / CSV File]
     Append -->|Cloud Export| GSheets[Google Sheets via gspread]
 ```
