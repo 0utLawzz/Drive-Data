@@ -1,0 +1,11 @@
+{
+  "google_sheet": true,
+  "excel_export": true,
+  "csv_export": true,
+  "submission_module": false,
+  "debug": false,
+  "sheet_id": "1Hiqcudjg-rqcm0kC-EvJv5vZeYjK3AngiS91lYmrbkY",
+  "sheet_name": "List",
+  "consultants_path": "F:\\Brandex004\\My Drive\\2 CONSULTANTS",
+  "clients_path": "F:\\Brandex004\\My Drive\\1 ALL CLIENTS"
+}

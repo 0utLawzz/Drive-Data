@@ -1,0 +1,289 @@
+# Data-Shaper V2 Refactor Instructions
+
+## Objective
+
+Refactor the existing project without breaking any current functionality.
+
+This is **NOT a rewrite**.
+
+Keep all existing features working while improving the architecture, readability, maintainability, and future scalability.
+
+---
+
+# Important Rules
+
+* DO NOT remove any working functionality.
+* DO NOT change the output format.
+* DO NOT remove Google Sheets support.
+* DO NOT remove Excel or CSV export.
+* DO NOT implement Submission Integration yet.
+* Keep Submission Module as a future placeholder only.
+* Preserve existing regex behaviour unless replacing it with a more robust equivalent.
+* Backward compatibility is mandatory.
+
+---
+
+# Current Features To Preserve
+
+* Drive folder scanning
+* Client detection
+* Case folder detection
+* Trademark extraction
+* TM Number extraction
+* Class extraction
+* Document detection
+* Google Sheets upload
+* CSV export
+* Excel export
+* Duplicate prevention
+
+---
+
+# Refactor Goals
+
+## 1. Modularize Project
+
+Create this structure:
+
+```
+Data-Shaper/
+
+scanner/
+    parser.py
+    scanner.py
+    detector.py
+    exporter.py
+
+config/
+    settings.json
+    patterns.json
+
+utils/
+    logger.py
+    helpers.py
+
+main.py
+```
+
+---
+
+## 2. Parser
+
+Move every parsing function into
+
+```
+scanner/parser.py
+```
+
+Parser must support multiple folder formats.
+
+Examples:
+
+```
+A020-003 Trendy Toys 747478 C32
+
+A020-003 Trendy Toys 747478 Class 32
+
+A020-003 Trendy-Toys
+
+A020-003
+
+A-020-003 Trendy Toys
+
+X015-001 My Brand 555555 C5
+```
+
+Parser should never crash because of malformed folder names.
+
+Missing fields should simply return empty values.
+
+---
+
+## 3. Document Detector
+
+Move all document pattern logic into
+
+```
+scanner/detector.py
+```
+
+Load patterns dynamically from
+
+```
+config/patterns.json
+```
+
+No hardcoded regex lists inside Python.
+
+---
+
+## 4. Scanner
+
+scanner.py should only
+
+* walk directories
+* discover clients
+* discover case folders
+* collect filenames
+
+No parsing logic here.
+
+No regex here.
+
+---
+
+## 5. Exporter
+
+Move
+
+Excel
+
+CSV
+
+Google Sheets
+
+into
+
+```
+scanner/exporter.py
+```
+
+---
+
+## 6. Configuration
+
+Create
+
+```
+config/settings.json
+```
+
+Example
+
+```json
+{
+  "google_sheet": true,
+  "excel_export": true,
+  "csv_export": true,
+  "submission_module": false,
+  "debug": false
+}
+```
+
+---
+
+## 7. Logging
+
+Replace print statements with logging.
+
+Create
+
+```
+logs/
+
+scan.log
+
+errors.log
+```
+
+Every scan should generate
+
+Processed folders
+
+Success
+
+Warnings
+
+Errors
+
+Duration
+
+---
+
+## 8. Client Validation
+
+Validate
+
+Client Code
+
+Client Type
+
+Client Name
+
+If folder name differs from existing records
+
+Generate warning
+
+Do not stop execution.
+
+---
+
+## 9. Duplicate Detection
+
+Keep existing duplicate logic.
+
+Improve it where possible.
+
+Never create duplicate records.
+
+---
+
+## 10. Performance
+
+Avoid repeated filesystem reads.
+
+Avoid duplicate regex compilation.
+
+Avoid scanning folders twice.
+
+---
+
+## 11. Future Modules
+
+Create empty placeholder folders only.
+
+```
+submissions/
+
+merge/
+
+dashboard/
+```
+
+Do not implement them yet.
+
+---
+
+# Testing
+
+Create parser tests using real folder names.
+
+Examples
+
+```
+A020-003 Trendy Toys 747478 C32
+
+Expected
+
+Client Type = A
+
+Client Code = 020
+
+Case = 003
+
+Trademark = Trendy Toys
+
+TM = 747478
+
+Class = 32
+```
+
+Parser should pass every test before deployment.
+
+---
+
+# Final Goal
+
+The application should behave exactly like the current version from the user's perspective.
+
+Internally it should become modular, maintainable, configurable, easier to extend, and ready for future Submission Integration and Merge Engine development.

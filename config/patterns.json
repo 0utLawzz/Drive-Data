@@ -1,0 +1,86 @@
+{
+  "TM-1": [
+    "\\bTM-1\\b",
+    "\\bTM1\\b",
+    "\\(TM-1\\)",
+    "\\[TM-1\\]"
+  ],
+  "TM-48": [
+    "\\bTM-48\\b",
+    "\\bTM48\\b",
+    "\\(TM-48\\)",
+    "\\[TM-48\\]",
+    "UPDATED\\s*\\[TM-48\\]",
+    "UPDATED\\s*X\\s*\\[TM-48\\]",
+    "TM-48\\s*-\\s*COPY",
+    "TM-48\\s*-\\s*COPY\\s*-\\s*COPY"
+  ],
+  "EXAM": [
+    "\\bTM-48\\b",
+    "\\bTM48\\b",
+    "\\bEXAMINATION\\b",
+    "\\bSHOWCASE\\b",
+    "SHOWCASE\\s*NOTICE",
+    "17\\(2\\)\\(B\\)",
+    "14\\(3\\)\\(A\\)",
+    "14\\(1\\)\\(b\\)",
+    "\\bREPLY\\b",
+    "REPLY\\s*OF\\s*NOTICE",
+    "MULTIPAL\\s*REPLIES",
+    "17\\(2\\)\\(B\\),\\s*14\\(3\\)\\(A\\)\\s*&\\s*14\\(1\\)\\(B\\)",
+    "17\\(2\\)\\(B\\),\\s*14\\(3\\)\\(A\\),\\s*14\\s*\\(1\\)\\s*\\(B\\).*AND\\s*14\\(1\\)\\(C\\)",
+    "REPLY\\s*\\[.*?\\]\\s*\\(\\d{2}-\\d{2}-\\d{4}\\)"
+  ],
+  "ACK": [
+    "\\bACK\\b",
+    "ACKNOWLEDGMENT",
+    "ACKNOLDGEMENT",
+    "ACK\\s*-\\s*A\\d{3}-\\d{3}.*?C\\d{2}.*?\\d{2}-\\w{3}-\\d{4}"
+  ],
+  "ACCEPTANCE": [
+    "\\bACCEPTANCE\\b",
+    "ACCEPTANCE\\s*DONE",
+    "COMPLETE\\s*FILE"
+  ],
+  "D-NOTE": [
+    "\\bTM-11\\b",
+    "\\bTM11\\b",
+    "IPO-PAKISTAN\\s*__\\s*TM\\s*11",
+    "TM\\s*11",
+    "DEMAND\\s*NOTE"
+  ],
+  "TM-16": [
+    "\\bTM-16\\b",
+    "\\bTM16\\b",
+    "IPO-PAKISTAN\\s*__\\s*TM\\s*16",
+    "TM\\s*16"
+  ],
+  "TM-50": [
+    "\\bTM-50\\b",
+    "\\bTM50\\b",
+    "IPO-PAKISTAN\\s*__\\s*TM\\s*50",
+    "TM\\s*50"
+  ],
+  "TM-06": [
+    "IPO-PAKISTAN\\s*__\\s*TM\\s*06",
+    "IPO-PAKISTAN\\s*__\\s*TM\\s*\\d{2}"
+  ],
+  "COMPANY": [
+    "BOARD\\s*OF\\s*RESULOTION",
+    "BOARD\\s*OF\\s*RESOLUTION"
+  ],
+  "OPPO": [
+    "WITHDRAWN\\s*LETTER"
+  ],
+  "PUB": [
+    "\\bPublication\\b",
+    "\\bPUBLICATION\\b"
+  ],
+  "CERTIFICATE": [
+    "\\bCERTIFICATE\\b",
+    "CERTIFICATE\\s*WITH\\s*SIGN",
+    "ORIGINAL\\s*CERTIFICATE",
+    "TRADE\\s*MARK\\s*CERTIFICATE",
+    "RENEWAL\\s*CERTIFICATE"
+  ]
+}
