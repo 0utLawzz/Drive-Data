@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Brandex Drive — Validation Report</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body   { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; background: #f4f6f9; color: #222; }
+    .hdr   { background: #1a3a5c; color: #fff; padding: 24px 36px; }
+    .hdr h1{ margin: 0 0 6px; font-size: 1.45rem; }
+    .hdr p { margin: 0; font-size: .88rem; opacity: .78; }
+    .badge { display: inline-block; margin-top: 12px; padding: 5px 14px; border-radius: 20px;
+              font-size: .85rem; font-weight: 600; background: #c0392b; color: #fff; }
+    .wrap  { padding: 24px 36px 36px; }
+    h2     { font-size: 1.1rem; color: #1a3a5c; border-bottom: 2px solid #1a3a5c; padding-bottom: 6px; margin-top: 32px; }
+    table  { width: 100%; border-collapse: collapse; background: #fff;
+              box-shadow: 0 1px 4px rgba(0,0,0,.1); border-radius: 8px; overflow: hidden; margin-bottom: 20px; }
+    th     { background: #1a3a5c; color: #fff; padding: 9px 14px; text-align: left; font-size: .82rem; }
+    td     { padding: 8px 14px; font-size: .83rem; border-bottom: 1px solid #eee; vertical-align: top; }
+    tr:last-child td { border-bottom: none; }
+    .lbl   { width: 260px; font-weight: 600; }
+    .val   { width: 100px; }
+    .extra { color: #666; font-size: .78rem; }
+    .mono  { font-family: monospace; font-size: .78rem; white-space: pre-wrap; }
+    .cnt   { text-align: center; }
+    .sug   { color: #555; }
+    .fail td { background: #fdf2f0; }
+    .warn td { background: #fef9ec; }
+    .fail td:nth-child(3) { color: #c0392b; font-size: .78rem; }
+    .warn td:nth-child(3) { color: #d68910; font-size: .78rem; }
+    .note  { background: #fff8e1; border-left: 4px solid #f39c12; padding: 12px 18px;
+              border-radius: 4px; font-size: .85rem; margin-bottom: 16px; }
+  </style>
+</head>
+<body>
+  <div class="hdr">
+    <h1>&#x1F5C2;&#xFE0F; Brandex Drive &mdash; Validation Report</h1>
+    <p>Generated: 2026-07-09 16:59:29 &nbsp;|&nbsp; Duration: 427.2s</p>
+    <div class="badge">⚠️  367 failure(s), 26 duplicate(s)</div>
+  </div>
+  <div class="wrap">
+
+    <div class="note">
+      &#x2139;&#xFE0F; This report validates <b>parser behaviour only</b>. No project code was modified.
+      Confirmed bugs are documented in the Recommendations section.
+    </div>
+
+    <h2>Summary Statistics</h2>
+    <table>
+      <thead><tr><th>Metric</th><th>Count</th><th>% of Cases</th></tr></thead>
+      <tbody><tr><td class="lbl">Root folders scanned</td><td class="val">1</td><td class="extra">1 ALL CLIENTS</td></tr><tr><td class="lbl">Client folders scanned</td><td class="val">63</td><td></td></tr><tr><td class="lbl">Case folders scanned</td><td class="val">871</td><td></td></tr><tr><td class="lbl">Files scanned</td><td class="val">3321</td><td></td></tr><tr><td class="lbl">Records generated</td><td class="val">845</td><td></td></tr><tr><td class="lbl">Processing duration</td><td class="val">427.2s</td><td></td></tr><tr><td class="lbl">─── Parse Results ───</td><td class="val"></td><td></td></tr><tr><td class="lbl">Cases fully parsed</td><td class="val">488</td><td class="extra">56.0%</td></tr><tr><td class="lbl">Parse warnings</td><td class="val">16</td><td class="extra">1.8%</td></tr><tr><td class="lbl">Parse failures</td><td class="val">367</td><td class="extra">42.1%</td></tr><tr><td class="lbl">─── Data Quality ───</td><td class="val"></td><td></td></tr><tr><td class="lbl">Duplicate records</td><td class="val">26</td><td></td></tr><tr><td class="lbl">Empty case folders</td><td class="val">32</td><td></td></tr><tr><td class="lbl">Missing TM Number</td><td class="val">194</td><td class="extra">22.3%</td></tr><tr><td class="lbl">Missing Class code</td><td class="val">125</td><td class="extra">14.4%</td></tr><tr><td class="lbl">Missing Case Number</td><td class="val">214</td><td class="extra">24.6%</td></tr><tr><td class="lbl">Unrecognized client folders</td><td class="val">0</td><td></td></tr></tbody>
+    </table>
+
+    <h2>Top Unrecognised Folder Patterns &amp; Suggested Fixes</h2>
+    <table>
+      <thead>
+        <tr><th>#</th><th>Pattern</th><th>Count</th><th>Examples</th><th>Suggested Improvement</th></tr>
+      </thead>
+      <tbody><tr><td>1</td><td class="mono">[OTHER] [UPPER] [UPPER] [TM_NO] [CLASS]</td><td class="cnt">63</td><td>A52-029 SOULFUL BITES 874479 C43; A52-030 CITY MOTORS 879555 C35; A52-027 MARHABA FOODS 862188 C35</td><td class="sug">TM No detected but Case # is missing — prepend the Case # (e.g. A001-001) before the case name.</td></tr>
+<tr><td>2</td><td class="mono">[OTHER] [UPPER] [TM_NO] [CLASS]</td><td class="cnt">37</td><td>A54-005 SERENE  869624 C5; A52-030 RIVER 851860 C7; A52-006 CPR 517482 C39</td><td class="sug">TM No detected but Case # is missing — prepend the Case # (e.g. A001-001) before the case name.</td></tr>
+<tr><td>3</td><td class="mono">[OTHER] [UPPER] [UPPER] [UPPER] [TM_NO] [CLASS]</td><td class="cnt">27</td><td>A54-006 PAKLAND PUBLIC SCHOOL 872936 C41; A54-001 BM SWEET SUPARI 773953 C30; A52-018 BUSINESS WORLD ENTERPRISE 741482 C36</td><td class="sug">TM No detected but Case # is missing — prepend the Case # (e.g. A001-001) before the case name.</td></tr>
+<tr><td>4</td><td class="mono">[CASE_NO] [UPPER] [CLASS]</td><td class="cnt">22</td><td>A003-029 ASAR C32; A003-024 HEMERSIN C30; A003-020 BEHTREEN C31</td><td class="sug">Folder is missing: TM No (6 digits).</td></tr>
+<tr><td>5</td><td class="mono">[CASE_NO] [UPPER] [UPPER] [CLASS]</td><td class="cnt">22</td><td>A003-006 KHAN SALANTY C30; A039-015 HAK COSMETICS C3; A039-014 GLOW JANAN C3</td><td class="sug">Folder is missing: TM No (6 digits).</td></tr>
+<tr><td>6</td><td class="mono">[CASE_NO] [UPPER] [UPPER]</td><td class="cnt">13</td><td>A003-028 BEHTREEN TEA; A003-055 FANTASTIC CP; A003-021 KHEWRA MUMTAZ</td><td class="sug">Only Case # found — add 6-digit TM No and class code (e.g. C01) to the folder name so all fields can be extracted.</td></tr>
+<tr><td>7</td><td class="mono">[CASE_NO] [UPPER] [UPPER] [UPPER]</td><td class="cnt">11</td><td>A003-001 MULTIPAL REPLY MIX; A039-003 AMJAD ALI FBR; A032-003 THE J ASSOCIATES</td><td class="sug">Only Case # found — add 6-digit TM No and class code (e.g. C01) to the folder name so all fields can be extracted.</td></tr>
+<tr><td>8</td><td class="mono">[CASE_NO] [UPPER] [UPPER] [UPPER] [UPPER]</td><td class="cnt">10</td><td>A003-049 TARIQ BANNU BEEF PULAO; A023-053 MINAL MALIK KHURAM ADV; A025-007 COPY RIGHTS OF SAWERA</td><td class="sug">Only Case # found — add 6-digit TM No and class code (e.g. C01) to the folder name so all fields can be extracted.</td></tr>
+<tr><td>9</td><td class="mono">[OTHER] [UPPER] [UPPER] [UPPER] [UPPER] [TM_NO] [CLASS]</td><td class="cnt">10</td><td>A54-003 CITY EDUCATION SCHOOL SYSTEM 869619 C41; A54-002 LAHORI GOLD SWEET SUPARI 773616 C30; A52-001 REGALIA UNIFORM MAIRA SUFIYAN 492478 C25</td><td class="sug">TM No detected but Case # is missing — prepend the Case # (e.g. A001-001) before the case name.</td></tr>
+<tr><td>10</td><td class="mono">[OTHER] [UPPER] [UPPER] [UPPER]</td><td class="cnt">9</td><td>A51-016 M TAHIR NTN; A51-015 IMRAN KHAN NTN; A50-002 ECONICS PRIVATE LIMITED</td><td class="sug">All-caps text with no structured codes — add Case # (e.g. A001-001), TM No (6 digits), and Class (e.g. C01).</td></tr>
+</tbody>
+    </table>
+
+    <h2>&#x26A0;&#xFE0F; Confirmed Parser Bug</h2>
+    <div class="note" style="border-left-color:#c0392b;background:#fdf2f0;">
+      <b>Bug in <code>parse_case_folder()</code> — 2-digit Case Numbers not recognised</b><br><br>
+      The regex <code>^[A-Z]\d{3}-\d{3}$</code> requires <b>exactly 3 digits</b> before the dash
+      (e.g. <code>A001-001</code>). The real Brandex dataset contains folders with
+      <b>2-digit</b> prefixes such as <code>A52-029</code>, <code>A54-005</code>, <code>A51-016</code>.
+      These are valid Case Numbers but the regex fails to match them — they are
+      silently classified as <code>[OTHER]</code> tokens and the Case # field is left blank.<br><br>
+      <b>Impact:</b> 173 case folders have a valid TM No but an empty Case # solely because of
+      this mismatch. Patterns 1, 2, 3, and 9 in the table above are all instances of this one bug.<br><br>
+      <b>Affected line (main.py ~39):</b><br>
+      <code style="display:block;background:#f8f8f8;padding:8px;margin:6px 0;border-radius:4px;">
+        if re.match(r'^[A-Z]\d{3}-\d{3}
+    <table>
+      <thead><tr><th>Client Folder</th><th>Case Folder</th><th>Issues</th></tr></thead>
+      <tbody><tr class="fail"><td>A-003 MUMTAZ ALI GHUARI MULTAN</td><td>A003-028 BEHTREEN TEA</td><td>missing TM No (expected 6-digit number)</td></tr>
+<tr class="fail"><td>A-003 MUMTAZ ALI GHUARI MULTAN</td><td>A003-050 BEARD UP COSMATICS C3</td><td>missing TM No (expected 6-digit number)</td></tr>
+<tr class="fail"><td>A-003 MUMTAZ ALI GHUARI MULTAN</td><td>A003-001 MULTIPAL REPLY MIX</td><td>missing TM No (expected 6-digit number)</td></tr>
+<tr class="fail"><td>A-003 MUMTAZ ALI GHUARI MULTAN</td><td>A003-029 ASAR C32</td><td>missing TM No (expected 6-digit number)</td></tr>
+<tr class="fail"><td>A-003 MUMTAZ ALI GHUARI MULTAN</td><td>A003-024 HEMERSIN C30</td><td>missing TM No (expected 6-digit number)</td></tr>
+<tr class="fail"><td>A-003 MUMTAZ ALI GHUARI MULTAN</td><td>A003-020 BEHTREEN C31</td><td>missing TM No (expected 6-digit number)</td></tr>
+<tr class="fail"><td>A-003 MUMTAZ ALI GHUARI MULTAN</td><td>A003-019 MANZIL C30</td><td>missing TM No (expected 6-digit number)</td></tr>
+<tr class="fail"><td>A-003 MUMTAZ ALI GHUARI MULTAN</td><td>A003-030 SUPREME C19</td><td>missing TM No (expected 6-digit number)</td></tr>
+<tr class="fail"><td>A-003 MUMTAZ ALI GHUARI MULTAN</td><td>A003-006 KHAN SALANTY C30</td><td>missing TM No (expected 6-digit number)</td></tr>
+<tr class="fail"><td>A-003 MUMTAZ ALI GHUARI MULTAN</td><td>A003-076 FANTASTIC MANGO FRUIT DRINK CP</td><td>missing TM No (expected 6-digit number)</td></tr>
+<tr class="fail"><td>A-003 MUMTAZ ALI GHUARI MULTAN</td><td>A003-055 FANTASTIC CP</td><td>missing TM No (expected 6-digit number)</td></tr>
+<tr class="fail"><td>A-003 MUMTAZ ALI GHUARI MULTAN</td><td>A003-021 KHEWRA MUMTAZ</td><td>missing TM No (expected 6-digit number)</td></tr>
+<tr class="fail"><td>A-003 MUMTAZ ALI GHUARI MULTAN</td><td>A003-015 AJWA MUMTAZ</td><td>missing TM No (expected 6-digit number)</td></tr>
+<tr class="fail"><td>A-003 MUMTAZ ALI GHUARI MULTAN</td><td>A003-009 ABE SHREEN ADV MUMTAZ 5360 C32</td><td>missing TM No (expected 6-digit number)</td></tr>
+<tr class="fail"><td>A-003 MUMTAZ ALI GHUARI MULTAN</td><td>A003-049 TARIQ BANNU BEEF PULAO</td><td>missing TM No (expected 6-digit number)</td></tr>
+<tr class="fail"><td>A-003 MUMTAZ ALI GHUARI MULTAN</td><td>A003-048 TERCERT-PHARMA</td><td>missing TM No (expected 6-digit number)</td></tr>
+<tr class="fail"><td>A-064 M AAMIR KRI</td><td>A064-001 RIVAAJ C30</td><td>missing TM No (expected 6-digit number)</td></tr>
+<tr class="fail"><td>A-060 SHAHZAD KARACHI</td><td>A060-001 DOB C43</td><td>missing TM No (expected 6-digit number)</td></tr>
+<tr class="fail"><td>A-059 WAQAS ILYAS ADV</td><td>A059-004 TKR 3463-2025 [CP]</td><td>missing TM No (expected 6-digit number)</td></tr>
+<tr class="fail"><td>A-059 WAQAS ILYAS ADV</td><td>A059-002 TKR OPPO [TM-5]</td><td>missing TM No (expected 6-digit number)</td></tr>
+<tr><td colspan="3"><em>… and 347 more (see validation_failures.csv)</em></td></tr>
+</tbody>
+    </table>
+
+    <h2>Parse Warnings <small style="font-weight:400;font-size:.8rem">(see validation_warnings.csv for full list)</small></h2>
+    <table>
+      <thead><tr><th>Client Folder</th><th>Case Folder</th><th>Warnings</th></tr></thead>
+      <tbody><tr class="warn"><td>A-003 MUMTAZ ALI GHUARI MULTAN</td><td>A003-014 ZIN OIL 540946 30</td><td>missing Class code (expected C01, C29, etc.)</td></tr>
+<tr class="warn"><td>A-002 MR FURQAN BRAND EXPERTS</td><td>A002-033 3D ZAREEN 872935 C-42</td><td>missing Class code (expected C01, C29, etc.)</td></tr>
+<tr class="warn"><td>A-060 SHAHZAD KARACHI</td><td>A060-012 EAT OUT BBQ CAFE 849728 43</td><td>missing Class code (expected C01, C29, etc.)</td></tr>
+<tr class="warn"><td>A-055 MALIK ZAID</td><td>A055-023 GRIP 846398</td><td>missing Class code (expected C01, C29, etc.)</td></tr>
+<tr class="warn"><td>A-055 MALIK ZAID</td><td>A055-022 HMU 715086</td><td>missing Class code (expected C01, C29, etc.)</td></tr>
+<tr class="warn"><td>A-055 MALIK ZAID</td><td>A055-021 MIKEES 809534</td><td>missing Class code (expected C01, C29, etc.)</td></tr>
+<tr class="warn"><td>A-055 MALIK ZAID</td><td>A055-013 PASSU WATER 812544</td><td>missing Class code (expected C01, C29, etc.)</td></tr>
+<tr class="warn"><td>A-035 KHURAM SHAHZAD ADV</td><td>A035-003 ICON TECHNICAL SERVICE 879553 37</td><td>missing Class code (expected C01, C29, etc.)</td></tr>
+<tr class="warn"><td>A-034 SHOAIB ADV ISB</td><td>A034-007 RESHINE OPPO TM-5 FILING 518527</td><td>missing Class code (expected C01, C29, etc.)</td></tr>
+<tr class="warn"><td>A-011 ANDAN ADV FSD</td><td>A011-001 KITCHEN TAG 582213</td><td>missing Class code (expected C01, C29, etc.)</td></tr>
+<tr class="warn"><td>A-006 UMAIR &amp; IRFAN</td><td>A006-016 LOGO 628734 VS LOGGO 701314</td><td>missing Class code (expected C01, C29, etc.)</td></tr>
+<tr class="warn"><td>A-006 UMAIR &amp; IRFAN</td><td>A006-004 DARMA FINE 622798</td><td>missing Class code (expected C01, C29, etc.)</td></tr>
+<tr class="warn"><td>A-006 UMAIR &amp; IRFAN</td><td>A006-002 ALPHA BEAUTY LIFE 548125</td><td>missing Class code (expected C01, C29, etc.)</td></tr>
+<tr class="warn"><td>A-004 HMMAS BADAR PEW</td><td>A004-070 STINGER 535997</td><td>missing Class code (expected C01, C29, etc.)</td></tr>
+<tr class="warn"><td>A-004 HMMAS BADAR PEW</td><td>A004-066 MALAKAND TEA 862745 30</td><td>missing Class code (expected C01, C29, etc.)</td></tr>
+<tr class="warn"><td>A-004 HMMAS BADAR PEW</td><td>A004-016 KAUSAR 549381 S2 OPP</td><td>missing Class code (expected C01, C29, etc.)</td></tr>
+</tbody>
+    </table>
+
+  </div>
+</body>
+</html>
+, part):  &nbsp;&nbsp;# ← only 3-digit prefix matched
+      </code>
+      <b>Correct regex (documented — not applied):</b><br>
+      <code style="display:block;background:#eafaf1;padding:8px;margin:6px 0;border-radius:4px;">
+        if re.match(r'^[A-Z]\d{2,3}-\d{3}
+    <table>
+      <thead><tr><th>Client Folder</th><th>Case Folder</th><th>Issues</th></tr></thead>
+      <tbody><tr class="fail"><td>A-003 MUMTAZ ALI GHUARI MULTAN</td><td>A003-028 BEHTREEN TEA</td><td>missing TM No (expected 6-digit number)</td></tr>
+<tr class="fail"><td>A-003 MUMTAZ ALI GHUARI MULTAN</td><td>A003-050 BEARD UP COSMATICS C3</td><td>missing TM No (expected 6-digit number)</td></tr>
+<tr class="fail"><td>A-003 MUMTAZ ALI GHUARI MULTAN</td><td>A003-001 MULTIPAL REPLY MIX</td><td>missing TM No (expected 6-digit number)</td></tr>
+<tr class="fail"><td>A-003 MUMTAZ ALI GHUARI MULTAN</td><td>A003-029 ASAR C32</td><td>missing TM No (expected 6-digit number)</td></tr>
+<tr class="fail"><td>A-003 MUMTAZ ALI GHUARI MULTAN</td><td>A003-024 HEMERSIN C30</td><td>missing TM No (expected 6-digit number)</td></tr>
+<tr class="fail"><td>A-003 MUMTAZ ALI GHUARI MULTAN</td><td>A003-020 BEHTREEN C31</td><td>missing TM No (expected 6-digit number)</td></tr>
+<tr class="fail"><td>A-003 MUMTAZ ALI GHUARI MULTAN</td><td>A003-019 MANZIL C30</td><td>missing TM No (expected 6-digit number)</td></tr>
+<tr class="fail"><td>A-003 MUMTAZ ALI GHUARI MULTAN</td><td>A003-030 SUPREME C19</td><td>missing TM No (expected 6-digit number)</td></tr>
+<tr class="fail"><td>A-003 MUMTAZ ALI GHUARI MULTAN</td><td>A003-006 KHAN SALANTY C30</td><td>missing TM No (expected 6-digit number)</td></tr>
+<tr class="fail"><td>A-003 MUMTAZ ALI GHUARI MULTAN</td><td>A003-076 FANTASTIC MANGO FRUIT DRINK CP</td><td>missing TM No (expected 6-digit number)</td></tr>
+<tr class="fail"><td>A-003 MUMTAZ ALI GHUARI MULTAN</td><td>A003-055 FANTASTIC CP</td><td>missing TM No (expected 6-digit number)</td></tr>
+<tr class="fail"><td>A-003 MUMTAZ ALI GHUARI MULTAN</td><td>A003-021 KHEWRA MUMTAZ</td><td>missing TM No (expected 6-digit number)</td></tr>
+<tr class="fail"><td>A-003 MUMTAZ ALI GHUARI MULTAN</td><td>A003-015 AJWA MUMTAZ</td><td>missing TM No (expected 6-digit number)</td></tr>
+<tr class="fail"><td>A-003 MUMTAZ ALI GHUARI MULTAN</td><td>A003-009 ABE SHREEN ADV MUMTAZ 5360 C32</td><td>missing TM No (expected 6-digit number)</td></tr>
+<tr class="fail"><td>A-003 MUMTAZ ALI GHUARI MULTAN</td><td>A003-049 TARIQ BANNU BEEF PULAO</td><td>missing TM No (expected 6-digit number)</td></tr>
+<tr class="fail"><td>A-003 MUMTAZ ALI GHUARI MULTAN</td><td>A003-048 TERCERT-PHARMA</td><td>missing TM No (expected 6-digit number)</td></tr>
+<tr class="fail"><td>A-064 M AAMIR KRI</td><td>A064-001 RIVAAJ C30</td><td>missing TM No (expected 6-digit number)</td></tr>
+<tr class="fail"><td>A-060 SHAHZAD KARACHI</td><td>A060-001 DOB C43</td><td>missing TM No (expected 6-digit number)</td></tr>
+<tr class="fail"><td>A-059 WAQAS ILYAS ADV</td><td>A059-004 TKR 3463-2025 [CP]</td><td>missing TM No (expected 6-digit number)</td></tr>
+<tr class="fail"><td>A-059 WAQAS ILYAS ADV</td><td>A059-002 TKR OPPO [TM-5]</td><td>missing TM No (expected 6-digit number)</td></tr>
+<tr><td colspan="3"><em>… and 347 more (see validation_failures.csv)</em></td></tr>
+</tbody>
+    </table>
+
+    <h2>Parse Warnings <small style="font-weight:400;font-size:.8rem">(see validation_warnings.csv for full list)</small></h2>
+    <table>
+      <thead><tr><th>Client Folder</th><th>Case Folder</th><th>Warnings</th></tr></thead>
+      <tbody><tr class="warn"><td>A-003 MUMTAZ ALI GHUARI MULTAN</td><td>A003-014 ZIN OIL 540946 30</td><td>missing Class code (expected C01, C29, etc.)</td></tr>
+<tr class="warn"><td>A-002 MR FURQAN BRAND EXPERTS</td><td>A002-033 3D ZAREEN 872935 C-42</td><td>missing Class code (expected C01, C29, etc.)</td></tr>
+<tr class="warn"><td>A-060 SHAHZAD KARACHI</td><td>A060-012 EAT OUT BBQ CAFE 849728 43</td><td>missing Class code (expected C01, C29, etc.)</td></tr>
+<tr class="warn"><td>A-055 MALIK ZAID</td><td>A055-023 GRIP 846398</td><td>missing Class code (expected C01, C29, etc.)</td></tr>
+<tr class="warn"><td>A-055 MALIK ZAID</td><td>A055-022 HMU 715086</td><td>missing Class code (expected C01, C29, etc.)</td></tr>
+<tr class="warn"><td>A-055 MALIK ZAID</td><td>A055-021 MIKEES 809534</td><td>missing Class code (expected C01, C29, etc.)</td></tr>
+<tr class="warn"><td>A-055 MALIK ZAID</td><td>A055-013 PASSU WATER 812544</td><td>missing Class code (expected C01, C29, etc.)</td></tr>
+<tr class="warn"><td>A-035 KHURAM SHAHZAD ADV</td><td>A035-003 ICON TECHNICAL SERVICE 879553 37</td><td>missing Class code (expected C01, C29, etc.)</td></tr>
+<tr class="warn"><td>A-034 SHOAIB ADV ISB</td><td>A034-007 RESHINE OPPO TM-5 FILING 518527</td><td>missing Class code (expected C01, C29, etc.)</td></tr>
+<tr class="warn"><td>A-011 ANDAN ADV FSD</td><td>A011-001 KITCHEN TAG 582213</td><td>missing Class code (expected C01, C29, etc.)</td></tr>
+<tr class="warn"><td>A-006 UMAIR &amp; IRFAN</td><td>A006-016 LOGO 628734 VS LOGGO 701314</td><td>missing Class code (expected C01, C29, etc.)</td></tr>
+<tr class="warn"><td>A-006 UMAIR &amp; IRFAN</td><td>A006-004 DARMA FINE 622798</td><td>missing Class code (expected C01, C29, etc.)</td></tr>
+<tr class="warn"><td>A-006 UMAIR &amp; IRFAN</td><td>A006-002 ALPHA BEAUTY LIFE 548125</td><td>missing Class code (expected C01, C29, etc.)</td></tr>
+<tr class="warn"><td>A-004 HMMAS BADAR PEW</td><td>A004-070 STINGER 535997</td><td>missing Class code (expected C01, C29, etc.)</td></tr>
+<tr class="warn"><td>A-004 HMMAS BADAR PEW</td><td>A004-066 MALAKAND TEA 862745 30</td><td>missing Class code (expected C01, C29, etc.)</td></tr>
+<tr class="warn"><td>A-004 HMMAS BADAR PEW</td><td>A004-016 KAUSAR 549381 S2 OPP</td><td>missing Class code (expected C01, C29, etc.)</td></tr>
+</tbody>
+    </table>
+
+  </div>
+</body>
+</html>
+, part):  # ← matches A52-029 AND A001-001
+      </code>
+      <em>main.py was NOT modified. Apply this fix deliberately and validate with compare_outputs.py.</em>
+    </div>
+
+    <h2>Parse Failures <small style="font-weight:400;font-size:.8rem">(see validation_failures.csv for full list)</small></h2>
+    <table>
+      <thead><tr><th>Client Folder</th><th>Case Folder</th><th>Issues</th></tr></thead>
+      <tbody><tr class="fail"><td>A-003 MUMTAZ ALI GHUARI MULTAN</td><td>A003-028 BEHTREEN TEA</td><td>missing TM No (expected 6-digit number)</td></tr>
+<tr class="fail"><td>A-003 MUMTAZ ALI GHUARI MULTAN</td><td>A003-050 BEARD UP COSMATICS C3</td><td>missing TM No (expected 6-digit number)</td></tr>
+<tr class="fail"><td>A-003 MUMTAZ ALI GHUARI MULTAN</td><td>A003-001 MULTIPAL REPLY MIX</td><td>missing TM No (expected 6-digit number)</td></tr>
+<tr class="fail"><td>A-003 MUMTAZ ALI GHUARI MULTAN</td><td>A003-029 ASAR C32</td><td>missing TM No (expected 6-digit number)</td></tr>
+<tr class="fail"><td>A-003 MUMTAZ ALI GHUARI MULTAN</td><td>A003-024 HEMERSIN C30</td><td>missing TM No (expected 6-digit number)</td></tr>
+<tr class="fail"><td>A-003 MUMTAZ ALI GHUARI MULTAN</td><td>A003-020 BEHTREEN C31</td><td>missing TM No (expected 6-digit number)</td></tr>
+<tr class="fail"><td>A-003 MUMTAZ ALI GHUARI MULTAN</td><td>A003-019 MANZIL C30</td><td>missing TM No (expected 6-digit number)</td></tr>
+<tr class="fail"><td>A-003 MUMTAZ ALI GHUARI MULTAN</td><td>A003-030 SUPREME C19</td><td>missing TM No (expected 6-digit number)</td></tr>
+<tr class="fail"><td>A-003 MUMTAZ ALI GHUARI MULTAN</td><td>A003-006 KHAN SALANTY C30</td><td>missing TM No (expected 6-digit number)</td></tr>
+<tr class="fail"><td>A-003 MUMTAZ ALI GHUARI MULTAN</td><td>A003-076 FANTASTIC MANGO FRUIT DRINK CP</td><td>missing TM No (expected 6-digit number)</td></tr>
+<tr class="fail"><td>A-003 MUMTAZ ALI GHUARI MULTAN</td><td>A003-055 FANTASTIC CP</td><td>missing TM No (expected 6-digit number)</td></tr>
+<tr class="fail"><td>A-003 MUMTAZ ALI GHUARI MULTAN</td><td>A003-021 KHEWRA MUMTAZ</td><td>missing TM No (expected 6-digit number)</td></tr>
+<tr class="fail"><td>A-003 MUMTAZ ALI GHUARI MULTAN</td><td>A003-015 AJWA MUMTAZ</td><td>missing TM No (expected 6-digit number)</td></tr>
+<tr class="fail"><td>A-003 MUMTAZ ALI GHUARI MULTAN</td><td>A003-009 ABE SHREEN ADV MUMTAZ 5360 C32</td><td>missing TM No (expected 6-digit number)</td></tr>
+<tr class="fail"><td>A-003 MUMTAZ ALI GHUARI MULTAN</td><td>A003-049 TARIQ BANNU BEEF PULAO</td><td>missing TM No (expected 6-digit number)</td></tr>
+<tr class="fail"><td>A-003 MUMTAZ ALI GHUARI MULTAN</td><td>A003-048 TERCERT-PHARMA</td><td>missing TM No (expected 6-digit number)</td></tr>
+<tr class="fail"><td>A-064 M AAMIR KRI</td><td>A064-001 RIVAAJ C30</td><td>missing TM No (expected 6-digit number)</td></tr>
+<tr class="fail"><td>A-060 SHAHZAD KARACHI</td><td>A060-001 DOB C43</td><td>missing TM No (expected 6-digit number)</td></tr>
+<tr class="fail"><td>A-059 WAQAS ILYAS ADV</td><td>A059-004 TKR 3463-2025 [CP]</td><td>missing TM No (expected 6-digit number)</td></tr>
+<tr class="fail"><td>A-059 WAQAS ILYAS ADV</td><td>A059-002 TKR OPPO [TM-5]</td><td>missing TM No (expected 6-digit number)</td></tr>
+<tr><td colspan="3"><em>… and 347 more (see validation_failures.csv)</em></td></tr>
+</tbody>
+    </table>
+
+    <h2>Parse Warnings <small style="font-weight:400;font-size:.8rem">(see validation_warnings.csv for full list)</small></h2>
+    <table>
+      <thead><tr><th>Client Folder</th><th>Case Folder</th><th>Warnings</th></tr></thead>
+      <tbody><tr class="warn"><td>A-003 MUMTAZ ALI GHUARI MULTAN</td><td>A003-014 ZIN OIL 540946 30</td><td>missing Class code (expected C01, C29, etc.)</td></tr>
+<tr class="warn"><td>A-002 MR FURQAN BRAND EXPERTS</td><td>A002-033 3D ZAREEN 872935 C-42</td><td>missing Class code (expected C01, C29, etc.)</td></tr>
+<tr class="warn"><td>A-060 SHAHZAD KARACHI</td><td>A060-012 EAT OUT BBQ CAFE 849728 43</td><td>missing Class code (expected C01, C29, etc.)</td></tr>
+<tr class="warn"><td>A-055 MALIK ZAID</td><td>A055-023 GRIP 846398</td><td>missing Class code (expected C01, C29, etc.)</td></tr>
+<tr class="warn"><td>A-055 MALIK ZAID</td><td>A055-022 HMU 715086</td><td>missing Class code (expected C01, C29, etc.)</td></tr>
+<tr class="warn"><td>A-055 MALIK ZAID</td><td>A055-021 MIKEES 809534</td><td>missing Class code (expected C01, C29, etc.)</td></tr>
+<tr class="warn"><td>A-055 MALIK ZAID</td><td>A055-013 PASSU WATER 812544</td><td>missing Class code (expected C01, C29, etc.)</td></tr>
+<tr class="warn"><td>A-035 KHURAM SHAHZAD ADV</td><td>A035-003 ICON TECHNICAL SERVICE 879553 37</td><td>missing Class code (expected C01, C29, etc.)</td></tr>
+<tr class="warn"><td>A-034 SHOAIB ADV ISB</td><td>A034-007 RESHINE OPPO TM-5 FILING 518527</td><td>missing Class code (expected C01, C29, etc.)</td></tr>
+<tr class="warn"><td>A-011 ANDAN ADV FSD</td><td>A011-001 KITCHEN TAG 582213</td><td>missing Class code (expected C01, C29, etc.)</td></tr>
+<tr class="warn"><td>A-006 UMAIR &amp; IRFAN</td><td>A006-016 LOGO 628734 VS LOGGO 701314</td><td>missing Class code (expected C01, C29, etc.)</td></tr>
+<tr class="warn"><td>A-006 UMAIR &amp; IRFAN</td><td>A006-004 DARMA FINE 622798</td><td>missing Class code (expected C01, C29, etc.)</td></tr>
+<tr class="warn"><td>A-006 UMAIR &amp; IRFAN</td><td>A006-002 ALPHA BEAUTY LIFE 548125</td><td>missing Class code (expected C01, C29, etc.)</td></tr>
+<tr class="warn"><td>A-004 HMMAS BADAR PEW</td><td>A004-070 STINGER 535997</td><td>missing Class code (expected C01, C29, etc.)</td></tr>
+<tr class="warn"><td>A-004 HMMAS BADAR PEW</td><td>A004-066 MALAKAND TEA 862745 30</td><td>missing Class code (expected C01, C29, etc.)</td></tr>
+<tr class="warn"><td>A-004 HMMAS BADAR PEW</td><td>A004-016 KAUSAR 549381 S2 OPP</td><td>missing Class code (expected C01, C29, etc.)</td></tr>
+</tbody>
+    </table>
+
+  </div>
+</body>
+</html>

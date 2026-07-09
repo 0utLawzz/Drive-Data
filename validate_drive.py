@@ -26,8 +26,10 @@ import html
 import os
 import re
 import sys
+import threading
 import time
 from collections import Counter, defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
 
@@ -67,6 +69,18 @@ def build_drive_service(creds_path: str):
         sys.exit(1)
     creds = Credentials.from_service_account_file(creds_path, scopes=SCOPES)
     return build("drive", "v3", credentials=creds)
+
+
+# Thread-local storage: each worker thread gets its own Drive service instance
+# (googleapiclient HTTP connections are not safe to share across threads).
+_thread_local = threading.local()
+
+def _get_thread_service(creds_path: str):
+    """Return a Drive service local to the calling thread, creating it if needed."""
+    if not hasattr(_thread_local, "service"):
+        creds = Credentials.from_service_account_file(creds_path, scopes=SCOPES)
+        _thread_local.service = build("drive", "v3", credentials=creds)
+    return _thread_local.service
 
 
 def list_items(service, parent_id: str, mime_filter: str | None = None,
@@ -270,96 +284,166 @@ class ValidationStats:
         self.end_time = time.time()
 
 
-def traverse_root(service, root_folder_id: str, root_label: str,
-                  stats: ValidationStats):
-    """Traverse one root folder (e.g. '1 ALL CLIENTS') and update stats."""
+def _process_client_folder(cf: dict, creds_path: str) -> dict:
+    """
+    Worker: process one client folder and return a plain dict of results.
+    Each thread builds its own Drive service so connections are not shared.
+    All heavy I/O (listing case folders and files) happens here in parallel.
+    """
+    svc = _get_thread_service(creds_path)
+
+    client_diag   = diagnose_client(cf["name"])
+    client_number = client_diag["client_number"]
+    client_name   = client_diag["client_name"]
+
+    result = {
+        "unrecognized_client": None if client_diag["recognized"] else cf["name"],
+        "failures":          [],
+        "warnings":          [],
+        "successful_parses": 0,
+        "missing_tm":        [],
+        "missing_class":     [],
+        "missing_case_no":   [],
+        "empty_cases":       [],
+        "files_scanned":     0,
+        "case_count":        0,
+        # Each entry: {"key": tuple, "client_folder": str, "case_folder": str}
+        "case_keys":         [],
+    }
+
+    case_folders = list_items(svc, cf["id"], mime_filter=FOLDER_MIME)
+
+    for casf in case_folders:
+        result["case_count"] += 1
+        case_diag = diagnose_case(casf["name"])
+
+        if case_diag["is_failure"]:
+            result["failures"].append({
+                "client_folder": cf["name"],
+                "case_folder":   casf["name"],
+                "issues":        "; ".join(case_diag["issues"]),
+                "case_no":       case_diag["case_no"],
+                "tm_no":         case_diag["tm_no"],
+                "class_code":    case_diag["class_code"],
+            })
+        elif case_diag["is_warning"]:
+            result["warnings"].append({
+                "client_folder": cf["name"],
+                "case_folder":   casf["name"],
+                "warnings":      "; ".join(case_diag["warnings"]),
+                "case_no":       case_diag["case_no"],
+                "tm_no":         case_diag["tm_no"],
+                "class_code":    case_diag["class_code"],
+            })
+        else:
+            result["successful_parses"] += 1
+
+        if not case_diag["tm_no"]:
+            result["missing_tm"].append(casf["name"])
+        if not case_diag["class_code"]:
+            result["missing_class"].append(casf["name"])
+        if not case_diag["case_no"]:
+            result["missing_case_no"].append(casf["name"])
+
+        # Record composite key — duplicate detection happens in the main thread
+        # after all workers finish, to avoid locking around seen_keys dict.
+        key = (
+            client_number,
+            client_name,
+            case_diag["case_no"],
+            case_diag["case_name"],
+            case_diag["tm_no"],
+            case_diag["class_code"],
+        )
+        result["case_keys"].append({
+            "key":           key,
+            "client_folder": cf["name"],
+            "case_folder":   casf["name"],
+        })
+
+        # File listing — same skip rules as main.py
+        files = list_items(svc, casf["id"])
+        real_files = [
+            f for f in files
+            if f["mimeType"] != FOLDER_MIME
+               and f["name"].lower() != "desktop.ini"
+               and not f["name"].lower().endswith(".ini")
+        ]
+        result["files_scanned"] += len(real_files)
+        if not real_files:
+            result["empty_cases"].append(casf["name"])
+
+    return result
+
+
+def traverse_root(creds_path: str, root_folder_id: str, root_label: str,
+                  stats: ValidationStats, workers: int = 12):
+    """
+    Traverse one root folder using a thread pool — one worker per client folder.
+    Duplicate-key detection is done in the main thread after workers finish
+    so it is never subject to race conditions.
+    """
     stats.root_folders_scanned += 1
     print(f"\n   📁 Scanning root: {root_label}")
 
-    client_folders = list_items(service, root_folder_id, mime_filter=FOLDER_MIME)
-    print(f"      Found {len(client_folders)} client folder(s)")
+    # Build a single-use service just for listing client folders
+    svc = build_drive_service(creds_path)
+    client_folders = list_items(svc, root_folder_id, mime_filter=FOLDER_MIME)
+    total_clients  = len(client_folders)
+    print(f"      Found {total_clients} client folder(s) — scanning with {workers} parallel workers…")
 
-    for cf in client_folders:
-        stats.client_folders_scanned += 1
-        client_diag = diagnose_client(cf["name"])
+    done_count = 0
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        future_map = {
+            pool.submit(_process_client_folder, cf, creds_path): cf
+            for cf in client_folders
+        }
+        for future in as_completed(future_map):
+            done_count += 1
+            if done_count % 100 == 0 or done_count == total_clients:
+                elapsed = round(time.time() - stats.start_time, 1)
+                print(f"      ↳ {done_count}/{total_clients} clients done  [{elapsed}s]")
 
-        if not client_diag["recognized"]:
-            stats.unrecognized_clients.append(cf["name"])
+            try:
+                r = future.result()
+            except Exception as exc:
+                cf = future_map[future]
+                print(f"      ⚠️  Worker error for {cf['name']!r}: {exc}")
+                continue
 
-        client_number = client_diag["client_number"]
-        client_name   = client_diag["client_name"]
+            # Merge worker result into shared stats (main thread only — no locks needed)
+            stats.client_folders_scanned += 1
+            stats.case_folders_scanned   += r["case_count"]
+            stats.files_scanned          += r["files_scanned"]
+            stats.successful_parses      += r["successful_parses"]
 
-        # List case folders
-        case_folders = list_items(service, cf["id"], mime_filter=FOLDER_MIME)
+            if r["unrecognized_client"]:
+                stats.unrecognized_clients.append(r["unrecognized_client"])
 
-        for casf in case_folders:
-            stats.case_folders_scanned += 1
-            case_diag = diagnose_case(casf["name"])
+            stats.failures.extend(r["failures"])
+            stats.warnings.extend(r["warnings"])
+            stats.missing_tm.extend(r["missing_tm"])
+            stats.missing_class.extend(r["missing_class"])
+            stats.missing_case_no.extend(r["missing_case_no"])
+            stats.empty_cases.extend(r["empty_cases"])
 
-            if case_diag["is_failure"]:
-                stats.failures.append({
-                    "client_folder": cf["name"],
-                    "case_folder":   casf["name"],
-                    "issues":        "; ".join(case_diag["issues"]),
-                    "case_no":       case_diag["case_no"],
-                    "tm_no":         case_diag["tm_no"],
-                    "class_code":    case_diag["class_code"],
-                })
-            elif case_diag["is_warning"]:
-                stats.warnings.append({
-                    "client_folder": cf["name"],
-                    "case_folder":   casf["name"],
-                    "warnings":      "; ".join(case_diag["warnings"]),
-                    "case_no":       case_diag["case_no"],
-                    "tm_no":         case_diag["tm_no"],
-                    "class_code":    case_diag["class_code"],
-                })
-            else:
-                stats.successful_parses += 1
-
-            if not case_diag["tm_no"]:
-                stats.missing_tm.append(casf["name"])
-            if not case_diag["class_code"]:
-                stats.missing_class.append(casf["name"])
-            if not case_diag["case_no"]:
-                stats.missing_case_no.append(casf["name"])
-
-            # Build composite key and check for duplicates BEFORE file listing.
-            # main.py adds every case folder to case_groups (including empty ones),
-            # so records_generated and duplicate detection must mirror that behaviour.
-            key = (
-                client_number,
-                client_name,
-                case_diag["case_no"],
-                case_diag["case_name"],
-                case_diag["tm_no"],
-                case_diag["class_code"],
-            )
-            if key in stats.seen_keys:
-                stats.duplicates.append({
-                    "client_folder":     cf["name"],
-                    "case_folder":       casf["name"],
-                    "first_seen_client": stats.seen_keys[key]["client"],
-                    "first_seen_case":   stats.seen_keys[key]["case"],
-                    "composite_key":     str(key),
-                })
-            else:
-                stats.seen_keys[key] = {"client": cf["name"], "case": casf["name"]}
-                stats.records_generated += 1
-
-            # List files in this case folder (after key tracking so empty folders
-            # are still counted as records, matching main.py behaviour)
-            files = list_items(service, casf["id"])
-            real_files = [
-                f for f in files
-                if f["mimeType"] != FOLDER_MIME
-                   and f["name"].lower() != "desktop.ini"
-                   and not f["name"].lower().endswith(".ini")
-            ]
-            stats.files_scanned += len(real_files)
-
-            if not real_files:
-                stats.empty_cases.append(casf["name"])
+            # Duplicate detection — main thread, no race risk
+            for ci in r["case_keys"]:
+                key = ci["key"]
+                if key in stats.seen_keys:
+                    stats.duplicates.append({
+                        "client_folder":     ci["client_folder"],
+                        "case_folder":       ci["case_folder"],
+                        "first_seen_client": stats.seen_keys[key]["client"],
+                        "first_seen_case":   stats.seen_keys[key]["case"],
+                        "composite_key":     str(key),
+                    })
+                else:
+                    stats.seen_keys[key] = {
+                        "client": ci["client_folder"],
+                        "case":   ci["case_folder"],
+                    }
+                    stats.records_generated += 1
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -783,6 +867,13 @@ def main():
         default=str(BASE_DIR / "credentials.json"),
         help="Path to Google Service Account credentials.json (default: ./credentials.json)"
     )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=12,
+        metavar="N",
+        help="Parallel worker threads for client-folder traversal (default: 12)"
+    )
     args = parser.parse_args()
 
     print("🔐 Authenticating with Google Drive…")
@@ -827,12 +918,12 @@ def main():
         sys.exit(1)
 
     # Traverse
-    stats = ValidationStats()
+    stats  = ValidationStats()
     run_ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    print(f"\n🚀 Starting traversal of {len(roots)} root folder(s)…")
+    print(f"\n🚀 Starting traversal of {len(roots)} root folder(s)  (workers={args.workers})…")
     for folder_id, label in roots:
-        traverse_root(service, folder_id, label, stats)
+        traverse_root(args.creds, folder_id, label, stats, workers=args.workers)
 
     stats.finish()
     root_labels = [label for _, label in roots]
