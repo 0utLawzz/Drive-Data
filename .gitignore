@@ -33,6 +33,7 @@ env/
 *~
 
 # Exports
+export/
 exports/
 *.xlsx
 *.csv

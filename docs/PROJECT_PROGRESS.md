@@ -13,7 +13,7 @@
 |---|---|
 | **Goal** | Scan Google Drive–mirrored folder structures for a trademark law firm, extract structured client/case/TM data from folder names, and export to Google Sheets or local Excel/CSV. Secondary goal: validate parser correctness against the live Brandex Drive dataset without modifying production code. |
 | **Current Version** | 1.2.0 |
-| **Current Sprint** | Sprint 3 — Parser V2 (token-based architecture) |
+| **Current Sprint** | Sprint 4 — Online Drive inventory (`drive_api/` + `inventory.py`) |
 
 ---
 
@@ -132,6 +132,36 @@ Results against live Brandex `1 ALL CLIENTS` folder (63 clients, 871 cases):
   - Full report: `export/parser_v2_validation_report.md`.
 - Confirmed Parser V2 is a strict improvement over the legacy engine on the
   real dataset with no observed backward-compatibility breaks.
+
+### ✅ Sprint 4 — Online Drive Inventory (`drive_api/` + `inventory.py`)
+*Completed: 2026-07-09*
+
+- Built `drive_api/` as the sole boundary for Google Drive API code
+  (`auth.py` Service Account + OAuth fallback, `config.py` settings.json
+  loader, `scanner.py` live traversal, `local_source.py` local-directory
+  adapter, `models.py` shared `DriveFolder`/`DriveFile` objects).
+- Removed the local-mount/Desktop-sync dependency for this workflow:
+  scanning now goes `Google Drive API → Folder ID → Python`, configured via
+  `settings.json` (`clients_folder_id`, `consultants_folder_id`,
+  `credentials_path`) instead of hardcoded paths.
+- `inventory.py` extracts full client/case/file metadata (folder IDs,
+  names, parents, client code/name, case #/name/TM No/class/case type,
+  created/modified timestamps, file extension/MIME/size/Drive URL) using
+  **Parser V2** for folder-name parsing — metadata only, file contents are
+  never read.
+- Exports `export/clients.csv`, `export/cases.csv`, `export/files.csv`,
+  `export/drive_inventory.xlsx` (3 worksheets), and a descriptive-only
+  `export/inventory_report.md` (totals, case types, missing TM/Class,
+  empty case folders, duplicate TM numbers, largest case folder, average
+  files per case).
+- `drive_api/local_source.py` lets `inventory.py --source local` run
+  offline against `sample_drive/` for smoke-testing, returning identical
+  object shapes to the live scanner so neither the parser nor the report
+  code needs to know the data source (verified: 7 clients / 15 cases / 67
+  files extracted correctly from `sample_drive/`).
+- No parser optimization work was done this sprint (explicitly out of
+  scope per direction); OI-3 (Submission Integration) and OI-5 (Dashboard)
+  were not started.
 
 ---
 
@@ -308,6 +338,25 @@ stays fixed only in Parser V2 until OI-7 (promotion) is decided.
 
 ---
 
+### 2026-07-09-H — Online Drive access isolated to `drive_api/`; parser stays source-agnostic
+
+**Date:** 2026-07-09
+**Decision:** All `googleapiclient`/`google.oauth2` usage for the new online
+inventory workflow lives in `drive_api/`. `inventory.py` and `parser_v2`
+consume only the plain `DriveFolder`/`DriveFile` objects defined in
+`drive_api/models.py`; `drive_api/local_source.py` produces the identical
+shape from a local directory (`sample_drive/`) for offline testing.
+**Reason:** Sprint 4 direction explicitly required that "the parser should
+not know whether data came from local folders or the Google Drive API."
+Isolating the API boundary also means future auth changes (e.g. Service
+Account → OAuth, or Shared Drive support) touch one module only.
+**Consequence:** Folder-name parsing for the new inventory always uses
+Parser V2 (not V1/`main.py`) — this is a new consumer of the already
+validated engine, not a change to `main.py` or a decision to promote V2 into
+production (OI-7 is unaffected and still open).
+
+---
+
 ## Completed Sprint — Sprint 2 Tasks (archived)
 
 1. ~~[OI-1] Fix the 2-digit Case Number regex in `main.py`.~~ **Superseded:**
@@ -320,34 +369,50 @@ stays fixed only in Parser V2 until OI-7 (promotion) is decided.
 
 ---
 
-## Next Sprint — Sprint 4 Tasks
+## Completed Sprint — Sprint 4 Tasks (archived)
+
+1. **Online Drive scanner (`drive_api/`)** — done. Service Account auth,
+   `settings.json`-driven folder IDs, no local mount required. See milestone
+   above and decision 2026-07-09-H.
+2. **Full client/case/file metadata extraction (`inventory.py`)** — done.
+3. **CSV + XLSX + Markdown report export** — done
+   (`export/{clients,cases,files}.csv`, `export/drive_inventory.xlsx`,
+   `export/inventory_report.md`).
+4. **Documentation updates** — this file, `PROJECT_BIBLE.md`, `CHANGELOG.md`.
+
+## Next Sprint — Sprint 5 Tasks
 
 > Replace this section at the start of each sprint. Archive the previous list as a
 > completed sprint block above.
 >
 > **Explicitly out of scope until directed otherwise: OI-3 Submission Integration.**
 
-1. **[OI-4] Investigate duplicate records (26 found in the first live-Drive run).**
+1. **Run `inventory.py` against the live Brandex Drive** and review
+   `export/inventory_report.md` once real `clients_folder_id`/
+   `consultants_folder_id` and `credentials.json` are provided — this
+   sprint only validated the pipeline against `sample_drive/`.
+
+2. **[OI-4] Investigate duplicate records (26 found in the first live-Drive run).**
    - Re-run `validate_drive.py` (full traversal, needed for file-based duplicate
      detection) or extend `validate_parser_v2.py` with duplicate-key tracking.
    - Determine whether duplicates are folder-naming errors or genuine data issues.
    - Document findings under a new Decisions Log entry.
 
-2. **[OI-7] Decide whether/when to promote Parser V2 into production.**
+3. **[OI-7] Decide whether/when to promote Parser V2 into production.**
    - Options: (a) swap `main.py` internals to import from `parser_v2`, (b) keep
      `main.py` frozen and make `parser_v2` the new entry point with its own CLI.
    - Requires stakeholder sign-off given `main.py` is actively used by the firm.
    - If promoted: re-run `validate_parser_v2.py`-style comparison as a post-cutover
      regression check, and bump the version.
 
-3. **[OI-8] Resolve the multi-TM-number folder convention (2 known cases).**
+4. **[OI-8] Resolve the multi-TM-number folder convention (2 known cases).**
    - Decide the business rule for folders with two 6-digit numbers (e.g. dispute
      records) — first-found, last-found, or flag for manual entry.
    - Encode the decision explicitly in `parser_v2/rules.py` once agreed, and add
      it to the Confirmed Business Rules table as BR-8.
 
-4. **[OI-2] TM recovery from filenames** (if the folder name lacks a TM No,
+5. **[OI-2] TM recovery from filenames** (if the folder name lacks a TM No,
    attempt to extract it from documents inside the folder) — still pending,
    unchanged from Sprint 1/2 backlog.
 
-5. **Do not start OI-3 (Submission Integration)** until explicitly requested.
+6. **Do not start OI-3 (Submission Integration)** until explicitly requested.

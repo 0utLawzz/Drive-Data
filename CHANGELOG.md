@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-07-09
+
+### Added
+- `drive_api/` — online Google Drive API access layer. Replaces the
+  `Google Drive → Desktop Sync → Local Path → Python` dependency with
+  `Google Drive API → Folder ID → Python`; no mounted Drive/Desktop client
+  required. Service Account auth by default (`drive_api/auth.py`), OAuth
+  fallback available. Folder IDs are configured in `settings.json`, not
+  hardcoded.
+- `drive_api/models.py` — shared `DriveFolder`/`DriveFile` objects returned
+  identically by the live scanner (`drive_api/scanner.py`) and a local
+  mirror adapter (`drive_api/local_source.py`), so parsing/report code never
+  needs to know the data source.
+- `inventory.py` — Sprint 4 entry point. Walks the full client/case/file
+  hierarchy (via `drive_api`, online or `--source local` for offline
+  smoke-testing against `sample_drive/`), parses folder names with
+  **Parser V2** (`parser_v2/`), and exports:
+  - `export/clients.csv`, `export/cases.csv`, `export/files.csv`
+  - `export/drive_inventory.xlsx` (Clients / Cases / Files worksheets)
+  - `export/inventory_report.md` — descriptive-only statistics (totals,
+    case types, missing TM/Class, empty case folders, duplicate TM
+    numbers, largest case folder, average files per case). No data is
+    modified or auto-corrected by this report.
+- File inventory is metadata-only by design — file *contents* are never
+  read.
+
+### Task context
+Sprint 4 priority: build a reliable online Drive inventory reflecting the
+current Brandex Drive structure, to understand real data shape before
+further parser/automation work. Submission integration (OI-3) and
+dashboards (OI-5) remain explicitly out of scope. No further parser
+optimization was done this sprint.
+
+Host: Replit
+Timestamp: 2026-07-09
+
+---
+
 ## [1.1.0] - 2026-07-09
 
 ### Added
