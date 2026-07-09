@@ -4,11 +4,39 @@ A Python CLI tool for trademark law firms. Scans Google Drive–mirrored folder 
 
 ## How to run
 
-The app runs as an interactive CLI. Start the **Run** workflow (or `python main.py` in the shell).
+### Interactive CLI (original tool)
+Start the **Run** workflow or run `python main.py` in the shell.
 
-### First-time setup
-1. Place your Google Service Account key file as `credentials.json` in the project root (never commit this file — it is gitignored).
-2. The hardcoded folder paths (`F:\Brandex004\My Drive\...`) are Windows-specific. Use **Option 4 – Custom Path** in the menu to point the tool at any folder on Replit, or update `consultants_path` / `clients_path` in `main.py`.
+The menu requires:
+- **Option 4 – Custom Path** to point at any folder on Replit (the defaults `F:\Brandex004\...` are Windows paths).
+- `credentials.json` in the project root if you want Google Sheets upload (see *First-time setup* below).
+
+### Non-interactive batch export (for testing / comparison)
+```bash
+python batch_export.py <drive_path> <output_prefix> [--max N]
+
+# Examples:
+python batch_export.py sample_drive old_output       # scan sample_drive/, write export/old_output.{csv,xlsx}
+python batch_export.py sample_drive new_output       # run again after refactoring main.py logic
+```
+
+### Compare old vs new output
+```bash
+python compare_outputs.py export/old_output.csv export/new_output.csv
+# Produces:
+#   export/comparison_report.csv   — machine-readable diff
+#   export/comparison_report.html  — colour-coded HTML report
+```
+
+### Workflow for refactoring validation
+1. `python batch_export.py sample_drive old_output`  — capture baseline from current `main.py` logic
+2. Make your changes to `main.py` (or copy refactored logic into `batch_export.py`)
+3. `python batch_export.py sample_drive new_output`  — capture output from new logic
+4. `python compare_outputs.py export/old_output.csv export/new_output.csv`  — generate diff report
+
+## First-time setup (Google Sheets)
+1. Place your Google Service Account key as `credentials.json` in the project root (gitignored — never commit).
+2. The Sheet ID is hardcoded in `main.py` (`SHEET_ID`). Update it to your own sheet.
 
 ## Tech stack
 
@@ -23,10 +51,13 @@ The app runs as an interactive CLI. Start the **Run** workflow (or `python main.
 
 | File | Purpose |
 |---|---|
-| `main.py` | Full CLI logic: parsing, pattern matching, Google Sheets auth, export |
+| `main.py` | Original interactive CLI — parsing, pattern matching, Google Sheets auth, export |
+| `batch_export.py` | Non-interactive runner for testing and comparison workflows |
+| `compare_outputs.py` | Diffs two CSV/Excel outputs; produces CSV + HTML comparison report |
+| `sample_drive/` | Realistic sample folder structure (7 clients, 15 cases) for local testing |
 | `requirements.txt` | Python dependencies |
 | `credentials.json` | Google Service Account key — place here, **never commit** |
-| `export/` | Auto-created output directory for Excel/CSV files |
+| `export/` | Auto-created output directory for Excel/CSV/report files |
 
 ## User preferences
 
