@@ -1,0 +1,1 @@
+- [Drive Folders List: parser engine convention](drive-folders-parser-v2.md) — main.py is frozen; new parsing logic goes in additive parser_v2/ package, validated live before promotion.

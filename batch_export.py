@@ -19,11 +19,17 @@ Step 4 — Generate diff report:
 
 Usage
 -----
-    python batch_export.py <drive_path> <output_prefix> [--max N]
+    python batch_export.py <drive_path> <output_prefix> [--max N] [--engine {v1,v2}]
 
 Examples:
     python batch_export.py sample_drive old_output
     python batch_export.py sample_drive new_output --max 50
+    python batch_export.py sample_drive v2_output --engine v2
+
+Engines
+-------
+--engine v1 (default) — legacy regex-based parser in main.py. Unchanged.
+--engine v2           — token-based Parser V2 (parser_v2/). See PROJECT_BIBLE.md.
 """
 
 import sys
@@ -34,12 +40,13 @@ from datetime import datetime
 import pandas as pd
 
 # ---------------------------------------------------------------------------
-# Import core logic from main.py so this runner always reflects the current
-# state of main.py without duplicating any business logic.
+# Import core logic from main.py (legacy engine) so this runner always
+# reflects the current state of main.py without duplicating any business
+# logic. Parser V2 is imported lazily inside main() only if --engine v2 is
+# requested, so the default behaviour and import surface stay unchanged.
 # ---------------------------------------------------------------------------
-# We import only the functions we need; main() itself is never called.
 try:
-    from main import process_directory
+    from main import process_directory as process_directory_v1
 except ImportError as exc:
     print(f"❌ Could not import from main.py: {exc}")
     sys.exit(1)
@@ -94,6 +101,10 @@ def main():
         "--max", type=int, default=None, metavar="N",
         help="Cap the number of records processed (useful for quick tests)"
     )
+    parser.add_argument(
+        "--engine", choices=["v1", "v2"], default="v1",
+        help="Parsing engine: v1 = legacy main.py (default), v2 = token-based Parser V2"
+    )
     args = parser.parse_args()
 
     drive_path = Path(args.drive_path)
@@ -101,7 +112,14 @@ def main():
         print(f"❌ Path not found: {drive_path}")
         sys.exit(1)
 
+    if args.engine == "v2":
+        from parser_v2 import process_directory as process_directory_v2
+        process_directory = process_directory_v2
+    else:
+        process_directory = process_directory_v1
+
     print(f"📁 Scanning  : {drive_path.resolve()}")
+    print(f"   Engine    : {args.engine}")
     print(f"   Output    : export/{args.output_prefix}.{{csv,xlsx}}")
 
     # process_directory signature: (base_path, prefix_to_remove, max_records)
