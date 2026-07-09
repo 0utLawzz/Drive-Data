@@ -177,12 +177,15 @@ def diagnose_case(folder_name: str) -> dict:
     if not case_no:
         issues.append("missing Case # (expected pattern like A001-001)")
     if not tm_no:
-        issues.append("missing TM No (expected 6-digit number)")
+        # BR-2: missing TM Number is a warning, not a failure — TM is optional
+        # at filing time and some case types (NTN etc.) never have one.
+        warnings.append("missing TM No (expected 6-digit number)")
     if not class_code:
+        # BR-3: missing Class code is a warning, not a failure.
         warnings.append("missing Class code (expected C01, C29, etc.)")
 
-    # Severity: failure = missing case_no OR tm_no; warning = missing class only
-    is_failure = (not case_no) or (not tm_no)
+    # Severity: failure = missing case_no only; warning = missing tm_no or class
+    is_failure = not case_no
     is_warning = (not is_failure) and bool(warnings)
     is_ok      = not issues and not warnings
 
