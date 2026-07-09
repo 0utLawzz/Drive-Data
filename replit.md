@@ -47,6 +47,27 @@ python compare_outputs.py export/old_output.csv export/new_output.csv
 | Google integration | gspread, google-auth |
 | Pattern matching | re (regex) |
 
+### Real-world Drive validation
+```bash
+# Requires credentials.json in the project root (Google Service Account key).
+# The service account must have the Drive folders shared with it.
+
+# Option A — let the script search for folders by name:
+python validate_drive.py
+
+# Option B — pass folder IDs directly (faster, avoids search ambiguity):
+python validate_drive.py --clients-id FOLDER_ID --consultants-id FOLDER_ID
+
+# Folder IDs are the long string in the Drive URL:
+# https://drive.google.com/drive/folders/<FOLDER_ID>
+
+# Outputs (all in export/):
+#   validation_report.html    — colour-coded summary
+#   validation_report.md      — statistics + recommendations
+#   validation_warnings.csv   — partial-parse warnings
+#   validation_failures.csv   — complete-parse failures
+```
+
 ## Key files
 
 | File | Purpose |
