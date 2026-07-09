@@ -163,6 +163,21 @@ Results against live Brandex `1 ALL CLIENTS` folder (63 clients, 871 cases):
   scope per direction); OI-3 (Submission Integration) and OI-5 (Dashboard)
   were not started.
 
+**Live Brandex Drive inventory run completed same day:**
+
+| Metric | Count |
+|---|---|
+| Total clients | 911 |
+| Total cases | 3,454 |
+| Total files | 12,309 |
+| Case types | Standard 1,947; Pending / No TM No 1,214; NTN / Administrative 255; Dispute / Rectification 38 |
+| Missing TM Number | 1,491 (43.2%) |
+| Missing Class code | 1,157 (33.5%) |
+| Empty case folders | 100 |
+| Duplicate TM numbers | 23 (each TM appears in exactly 2 case folders) |
+| Largest case folder | `A003-001 MULTIPAL REPLY MIX` (59 files) |
+| Average files per case | 3.56 |
+
 ---
 
 ## Confirmed Business Rules

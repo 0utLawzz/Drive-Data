@@ -237,7 +237,9 @@ def run(source: str, clients_id: Optional[str], consultants_id: Optional[str],
         print(f"Scanning local path {local_path} ...")
         all_rows.extend(walk_local_tree(local_path, max_clients=max_clients))
 
-    print(f"Found {len(all_rows)} case folders. Building records ...")
+    case_rows = [r for r in all_rows if r[1] is not None]
+    empty_clients = sum(1 for r in all_rows if r[1] is None)
+    print(f"Found {len(case_rows)} case folders ({empty_clients} empty client folders). Building records ...")
     client_records, case_records, file_records = build_records(all_rows)
 
     clients_df = pd.DataFrame(client_records)
