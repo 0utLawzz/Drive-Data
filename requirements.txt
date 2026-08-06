@@ -3,3 +3,5 @@ openpyxl
 gspread
 google-auth
 google-api-python-client
+customtkinter
+darkdetect
