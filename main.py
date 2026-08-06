@@ -14,7 +14,7 @@ EXPORT_DIR = str(BASE_DIR / "export")
 os.makedirs(EXPORT_DIR, exist_ok=True)
 
 # Google Sheets configuration
-SHEET_ID = "1Hiqcudjg-rqcm0kC-EvJv5vZeYjK3AngiS91lYmrbkY"
+SHEET_ID = "1yu27k_3Z6cCJmcnQI52z1dIC52Zi9ZxaKlo9wJiNFiQ"
 SHEET_NAME = "List"
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
 
@@ -152,56 +152,52 @@ def check_file_patterns(file_names):
     return results
 
 def process_directory(base_path, prefix_to_remove, max_records=None):
-    """Process directory and return list of records"""
+    """Process directory recursively and return list of records"""
     records = []
     case_groups = {}
     processed_count = 0
     
-    for client_folder in os.listdir(base_path):
+    for root, dirs, files in os.walk(base_path):
         if max_records and processed_count >= max_records:
             break
             
-        client_path = os.path.join(base_path, client_folder)
-        if not os.path.isdir(client_path):
+        if not files:
             continue
-        
-        client_number, client_name = parse_client_folder(client_folder)
-        
-        for case_folder in os.listdir(client_path):
-            if max_records and processed_count >= max_records:
-                break
-                
-            case_path = os.path.join(client_path, case_folder)
-            if not os.path.isdir(case_path):
-                continue
             
-            case_no, case_name, tm_no, class_code = parse_case_folder(case_folder)
+        # Determine relative path components
+        rel_path = os.path.relpath(root, base_path)
+        if rel_path == '.':
+            components = []
+        else:
+            components = rel_path.split(os.sep)
             
-            # Extract full case name using TM number
+        client_folder = components[0] if len(components) > 0 else ""
+        case_folder = components[1] if len(components) > 1 else ""
+        
+        client_number, client_name = parse_client_folder(client_folder) if client_folder else ("", "Root/Uncategorized")
+        case_no, case_name, tm_no, class_code = parse_case_folder(case_folder) if case_folder else ("", "No Case Folder", "", "")
+        
+        if tm_no and case_folder:
             full_case_name = extract_full_case_name(case_folder, tm_no)
             if full_case_name:
                 case_name = full_case_name
+                
+        case_key = (client_number, client_name, case_no, case_name, tm_no, class_code)
+        
+        valid_files = []
+        for file in files:
+            if file.lower() == 'desktop.ini':
+                continue
+            file_name, file_ext = os.path.splitext(file)
+            if file_ext.lower() == '.ini':
+                file_ext = ''
+            valid_files.append(f"{file_name}|{file_ext.lstrip('.')}")
             
-            case_key = (client_number, client_name, case_no, case_name, tm_no, class_code)
-            
-            files = []
-            for file in os.listdir(case_path):
-                file_path = os.path.join(case_path, file)
-                if os.path.isfile(file_path):
-                    # Skip desktop.ini files
-                    if file.lower() == 'desktop.ini':
-                        continue
-                    
-                    file_name, file_ext = os.path.splitext(file)
-                    # Remove .ini extension from any file
-                    if file_ext.lower() == '.ini':
-                        file_ext = ''
-                    files.append(f"{file_name}|{file_ext.lstrip('.')}")
-            
+        if valid_files:
             if case_key not in case_groups:
                 case_groups[case_key] = []
-            case_groups[case_key].extend(files)
-            processed_count += 1
+                processed_count += 1
+            case_groups[case_key].extend(valid_files)
     
     for (client_number, client_name, case_no, case_name, tm_no, class_code), files in case_groups.items():
         file_names = "\n".join([f.split("|")[0] for f in files if f.split("|")[0]])
