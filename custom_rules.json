@@ -2,10 +2,7 @@
   {
     "name": "TM-1",
     "patterns": [
-      "\\bTM-1\\b",
-      "\\bTM1\\b",
-      "\\(TM-1\\)",
-      "\\[TM-1\\]"
+      "\\b(TM1|TM\\-1|TM\\-01|TM\\ 01|tm1|tm\\-01|tm\\ 1|tm\\ 01)\\b"
     ],
     "target": "TM-1"
   },
@@ -49,6 +46,10 @@
     "name": "ACCEPTANCE",
     "patterns": [
       "\\bACCEPTANCE\\b",
+      "\\bACCEPT\\b",
+      "\\bACCEPTED\\b",
+      "\\baccepted\\b",
+      "\\baccept\\b",
       "ACCEPTANCE\\s*DONE",
       "COMPLETE\\s*FILE"
     ],
@@ -70,6 +71,9 @@
     "patterns": [
       "\\bTM-16\\b",
       "\\bTM16\\b",
+      "\\bTM 16\\b",
+      "TM\\s*16",
+      "IPO-PAKISTAN\\s*__\\s*TM\\s*16",
       "TM\\s*16"
     ],
     "target": "TM-16"
@@ -79,6 +83,8 @@
     "patterns": [
       "\\bTM-50\\b",
       "\\bTM50\\b",
+      "TM\\s*50",
+      "IPO-PAKISTAN\\s*__\\s*TM\\s*50",
       "TM\\s*50"
     ],
     "target": "TM-50"
@@ -87,7 +93,14 @@
     "name": "TM-06",
     "patterns": [
       "IPO-PAKISTAN\\s*__\\s*TM\\s*06",
-      "IPO-PAKISTAN\\s*__\\s*TM\\s*\\d{2}"
+      "IPO-PAKISTAN\\s*__\\s*TM\\s*\\d{2}",
+      "IPO-PAKISTAN\\s*__\\s*TM\\s*06",
+      "TM\\s*06",
+      "\\boppo\\b",
+      "\\bopposition\\b",
+      "\\bOPPO\\b",
+      "\\bOPPOSITION\\b",
+      "\\bTM6\\b"
     ],
     "target": "TM-06"
   },
@@ -99,7 +112,21 @@
       "\\bPVT\\s*LTD\\b",
       "\\bPRIVATE\\s*LIMITED\\b",
       "\\bSMC\\b",
-      "\\bLIMITED\\b"
+      "\\bLIMITED\\b",
+      "\\b(SMC)\\b",
+      "\\b(PVT)\\b",
+      "\\bLtd\\b",
+      "\\bLTD\\b",
+      "\\bDATA\\s*SHEET\\b",
+      "\\bAUDITORS\\s*CERTIFICATE\\b",
+      "\\bAUDITOR\\s*CONSENT\\b",
+      "\\bAUDITOR\\s*REPORT\\b",
+      "\\bAUDITORS\\b",
+      "\\bAUDITOR\\b",
+      "\\bauditors\\b",
+      "\\bauditor\\b",
+      "\\bINCORPORATION\\b",
+      "\\bFILING\\b"
     ],
     "target": "COMPANY"
   },
@@ -122,8 +149,14 @@
       "\\bOPPOSITION\\b",
       "GROUNDS\\s*OF\\s*OPPOSITION",
       "\\bOPPO\\b",
+      "\\bTM-05\\b",
+      "\\bTM-5\\b",
+      "\\bTM5\\b",
       "LEGAL\\s*NOTICE",
-      "LEGAL\\s*NOTIC\\b"
+      "LEGAL\\s*NOTIC\\b",
+      "\\bTM-06\\b",
+      "\\bTM-6\\b",
+      "\\bTM6\\b"
     ],
     "target": "OPPO"
   },
@@ -132,8 +165,14 @@
     "patterns": [
       "\\bPUBLICATION\\b",
       "JOURNAL\\s*PUBLICATION",
+      "J\\s*NO",
       "JOURNAL\\s*CONVERT",
-      "Journal_\\d+"
+      "\\bJOURNAL\\b",
+      "\\bPUB\\b",
+      "\\bJNO\\b",
+      "Journal_\\d+",
+      "PUB_\\d+",
+      "PUB\\d+"
     ],
     "target": "PUB"
   },
@@ -141,11 +180,26 @@
     "name": "CERTIFICATE",
     "patterns": [
       "\\bCERTIFICATE\\b",
+      "\\bCOM\\b",
+      "\\b[C]\\b",
+      "\\bCER\\b",
       "CERTIFICATE\\s*WITH\\s*SIGN",
       "ORIGINAL\\s*CERTIFICATE",
       "TRADE\\s*MARK\\s*CERTIFICATE",
       "RENEWAL\\s*CERTIFICATE"
     ],
     "target": "CERTIFICATE"
+  },
+  {
+    "name": "TM-11",
+    "patterns": [
+      "\\bTM-11\\b",
+      "\\bTM11\\b",
+      "\\bTM 11\\b",
+      "TM\\s*11",
+      "IPO-PAKISTAN\\s*__\\s*TM\\s*11",
+      "TM\\s*11"
+    ],
+    "target": "TM-11"
   }
 ]

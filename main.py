@@ -217,7 +217,13 @@ def check_file_patterns(file_names: str) -> dict:
     patterns   = get_active_patterns()
 
     def _hit(pats):
-        return any(re.search(p, all_text, re.IGNORECASE) for p in pats)
+        for p in pats:
+            try:
+                if re.search(p, all_text, re.IGNORECASE):
+                    return True
+            except re.error as e:
+                print(f"⚠️ Skipping bad pattern '{p}': {e}")
+        return False
 
     results = {cat: (True if _hit(pats) else False) for cat, pats in patterns.items()}
 
