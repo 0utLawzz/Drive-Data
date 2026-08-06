@@ -1,392 +1,363 @@
 import os
 import re
+import json
 import threading
 import pandas as pd
 from pathlib import Path
+from datetime import datetime
 import gspread
 from google.oauth2.service_account import Credentials
-from datetime import datetime
 import tkinter as tk
-from tkinter import filedialog
+from tkinter import filedialog, messagebox
 import customtkinter as ctk
 
-# ─── App Appearance ───────────────────────────────────────────────────────────
-ctk.set_appearance_mode("dark")
+# ══════════════════════════════════════════════════════════════════════════════
+#  APPEARANCE
+# ══════════════════════════════════════════════════════════════════════════════
+ctk.set_appearance_mode("light")
 ctk.set_default_color_theme("blue")
 
-# ─── Base Paths ───────────────────────────────────────────────────────────────
-BASE_DIR = Path(__file__).parent.resolve()
+# ══════════════════════════════════════════════════════════════════════════════
+#  NEO-BRUTALISM COLOUR PALETTE
+# ══════════════════════════════════════════════════════════════════════════════
+C = {
+    "bg":      "#F0E8D0",   # Warm Cream – main background
+    "bg_alt":  "#E8DFC7",   # Deep Cream – alternate / section bg
+    "panel":   "#FAF6EE",   # Off-White – cards, inputs
+    "black":   "#0C0C0C",   # Near-Black – borders, text, shadow
+    "accent":  "#C94A00",   # Burnt Orange – CTA, active elements
+    "teal":    "#0A6B52",   # Dark Teal – success, secondary action
+    "teal_lt": "#0D9970",   # Bright Teal – links, hover highlights
+    "yellow":  "#D4A800",   # Bold Yellow – warnings, stamps
+    "dim":     "#888888",   # Muted – subtitles, captions
+    "white":   "#FFFFFF",
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  PATHS & CONFIG
+# ══════════════════════════════════════════════════════════════════════════════
+BASE_DIR   = Path(__file__).parent.resolve()
 EXPORT_DIR = str(BASE_DIR / "export")
+RULES_FILE = str(BASE_DIR / "custom_rules.json")
 os.makedirs(EXPORT_DIR, exist_ok=True)
 
-# ─── Google Sheets Config ─────────────────────────────────────────────────────
 SHEET_ID   = "1yu27k_3Z6cCJmcnQI52z1dIC52Zi9ZxaKlo9wJiNFiQ"
 SHEET_NAME = "List"
 SCOPES     = [
-    'https://www.googleapis.com/auth/spreadsheets',
-    'https://www.googleapis.com/auth/drive'
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive",
 ]
 
-# Default paths (user can override via GUI)
 DEFAULT_CLIENTS_PATH     = r"F:\Br004\My Drive\1 ALL CLIENTS"
 DEFAULT_CONSULTANTS_PATH = r"F:\Br004\My Drive\2 CONSULTANTS"
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  PARSING HELPERS
+#  DEFAULT PATTERN RULES  (14 rules — updated per user feedback)
 # ══════════════════════════════════════════════════════════════════════════════
 
-def parse_client_folder(folder_name):
-    """Extract (client_number, client_name) from a client folder name."""
-    match = re.match(r'^([A-Z]-\d+)\s+(.+)$', folder_name)
-    if match:
-        return match.group(1), match.group(2)
-    return "", folder_name
-
-
-def parse_case_folder(folder_name):
-    """Extract (case_no, case_name, tm_no, class_code) from a case folder name."""
-    parts = folder_name.split()
-    case_no = case_name = tm_no = class_code = ""
-    for part in parts:
-        if re.match(r'^[A-Z]\d{3}-\d{3}$', part):
-            case_no = part
-        elif case_no and not case_name and re.match(r'^[A-Z][a-zA-Z]+$', part):
-            case_name = part
-        elif re.match(r'^\d{6}$', part):
-            tm_no = part
-        elif re.match(r'^[C]\d+$', part):
-            class_code = part
-    return case_no, case_name, tm_no, class_code
-
-
-def extract_full_case_name(folder_name, tm_no):
-    """Extract full case name using TM number as a right-side delimiter."""
-    if not tm_no:
-        return ""
-    match = re.search(rf'\b{tm_no}\b', folder_name)
-    if match:
-        parts = folder_name.split()
-        case_name_parts = []
-        found_case_no = False
-        for part in parts:
-            if re.match(r'^[A-Z]\d{3}-\d{3}$', part):
-                found_case_no = True
-                continue
-            elif found_case_no and part != tm_no and not re.match(r'^[C]\d+$', part):
-                case_name_parts.append(part)
-            elif part == tm_no:
-                break
-        return " ".join(case_name_parts)
-    return ""
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-#  PATTERN MATCHING  — 20 Rules
-# ══════════════════════════════════════════════════════════════════════════════
-
-ALL_PATTERNS = {
-    # ── Original 13 ───────────────────────────────────────────────────────────
-    'TM-1': [
-        r'\bTM-1\b', r'\bTM1\b', r'\(TM-1\)', r'\[TM-1\]'
+DEFAULT_PATTERNS = {
+    "TM-1": [
+        r"\bTM-1\b", r"\bTM1\b", r"\(TM-1\)", r"\[TM-1\]",
     ],
-    'TM-48': [
-        r'\bTM-48\b', r'\bTM48\b', r'\(TM-48\)', r'\[TM-48\]',
-        r'UPDATED\s*\[TM-48\]', r'UPDATED\s*X\s*\[TM-48\]',
-        r'TM-48\s*-\s*COPY', r'TM-48\s*-\s*COPY\s*-\s*COPY'
+    "TM-48": [
+        r"\bTM-48\b", r"\bTM48\b", r"\(TM-48\)", r"\[TM-48\]",
+        r"UPDATED\s*\[TM-48\]", r"TM-48\s*-\s*COPY",
     ],
-    'EXAM': [
-        r'\bTM-48\b', r'\bTM48\b', r'\bEXAMINATION\b', r'\bSHOWCASE\b',
-        r'SHOWCASE\s*NOTICE', r'17\(2\)\(B\)', r'14\(3\)\(A\)', r'14\(1\)\(b\)',
-        r'\bREPLY\b', r'REPLY\s*OF\s*NOTICE', r'MULTIPAL\s*REPLIES',
-        r'17\(2\)\(B\),\s*14\(3\)\(A\)\s*&\s*14\(1\)\(B\)',
-        r'17\(2\)\(B\),\s*14\(3\)\(A\),\s*14\s*\(1\)\s*\(B\).*AND\s*14\(1\)\(C\)',
-        r'REPLY\s*\[.*?\]\s*\(\d{2}-\d{2}-\d{4}\)'
+    "EXAM": [
+        r"\bEXAMINATION\b", r"\bSHOWCASE\b", r"SHOWCASE\s*NOTICE",
+        r"17\(2\)\(B\)", r"14\(3\)\(A\)", r"14\(1\)\(b\)",
+        r"\bREPLY\b", r"REPLY\s*OF\s*NOTICE", r"MULTIPAL\s*REPLIES",
     ],
-    'ACK': [
-        r'\bACK\b', r'ACKNOWLEDGMENT', r'ACKNOLDGEMENT',
-        r'ACK\s*-\s*A\d{3}-\d{3}.*?C\d{2}.*?\d{2}-\w{3}-\d{4}'
+    "ACK": [
+        r"\bACK\b", r"ACKNOWLEDGMENT", r"ACKNOLDGEMENT",
     ],
-    'ACCEPTANCE': [
-        r'\bACCEPTANCE\b', r'ACCEPTANCE\s*DONE', r'COMPLETE\s*FILE'
+    "ACCEPTANCE": [
+        r"\bACCEPTANCE\b", r"ACCEPTANCE\s*DONE", r"COMPLETE\s*FILE",
     ],
-    'D-NOTE': [
-        r'\bTM-11\b', r'\bTM11\b', r'IPO-PAKISTAN\s*__\s*TM\s*11', r'TM\s*11',
-        r'DEMAND\s*NOTE'
+    "D-NOTE": [
+        r"\bTM-11\b", r"\bTM11\b", r"IPO-PAKISTAN\s*__\s*TM\s*11",
+        r"TM\s*11", r"DEMAND\s*NOTE",
     ],
-    'TM-16': [
-        r'\bTM-16\b', r'\bTM16\b', r'IPO-PAKISTAN\s*__\s*TM\s*16', r'TM\s*16'
+    "TM-16": [r"\bTM-16\b", r"\bTM16\b", r"TM\s*16"],
+    "TM-50": [r"\bTM-50\b", r"\bTM50\b", r"TM\s*50"],
+    "TM-06": [
+        r"IPO-PAKISTAN\s*__\s*TM\s*06",
+        r"IPO-PAKISTAN\s*__\s*TM\s*\d{2}",
     ],
-    'TM-50': [
-        r'\bTM-50\b', r'\bTM50\b', r'IPO-PAKISTAN\s*__\s*TM\s*50', r'TM\s*50'
+    # COMPANY — board resolutions + company-type doc keywords
+    "COMPANY": [
+        r"BOARD\s*OF\s*RESULOTION", r"BOARD\s*OF\s*RESOLUTION",
+        r"\bPVT\s*LTD\b", r"\bPRIVATE\s*LIMITED\b",
+        r"\bSMC\b", r"\bLIMITED\b",
     ],
-    'TM-06': [
-        r'IPO-PAKISTAN\s*__\s*TM\s*06', r'IPO-PAKISTAN\s*__\s*TM\s*\d{2}'
+    # NTN — ID/CNIC docs, data sheets (non-company context handled in logic)
+    "NTN": [
+        r"\bNTN\b", r"\bCNIC\b", r"\bNIC\b", r"\bPASSPORT\b",
+        r"\bID\s*[BF]?\b", r"DATA\s*SHEET",
     ],
-    'COMPANY': [
-        r'BOARD\s*OF\s*RESULOTION', r'BOARD\s*OF\s*RESOLUTION'
+    # OPPO — opposition + legal notice merged here
+    "OPPO": [
+        r"WITHDRAWN\s*LETTER", r"\bOPPOSITION\b",
+        r"GROUNDS\s*OF\s*OPPOSITION", r"\bOPPO\b",
+        r"LEGAL\s*NOTICE", r"LEGAL\s*NOTIC\b",   # ← Legal Notice → OPPO
     ],
-    'OPPO': [
-        r'WITHDRAWN\s*LETTER', r'\bOPPOSITION\b', r'OPPO\b',
-        r'GROUNDS\s*OF\s*OPPOSITION'
+    "PUB": [
+        r"\bPUBLICATION\b", r"JOURNAL\s*PUBLICATION",
+        r"JOURNAL\s*CONVERT", r"Journal_\d+",
     ],
-    'PUB': [
-        r'\bPublication\b', r'\bPUBLICATION\b', r'JOURNAL\s*PUBLICATION',
-        r'JOURNAL\s*CONVERT'
-    ],
-    'CERTIFICATE': [
-        r'\bCERTIFICATE\b', r'CERTIFICATE\s*WITH\s*SIGN',
-        r'ORIGINAL\s*CERTIFICATE', r'TRADE\s*MARK\s*CERTIFICATE',
-        r'RENEWAL\s*CERTIFICATE'
-    ],
-    # ── 7 New Rules ───────────────────────────────────────────────────────────
-    'LEGAL NOTICE': [
-        r'LEGAL\s*NOTICE', r'LEGAL\s*NOTIC\b'
-    ],
-    'E-STAMP': [
-        r'\bE-STAMP\b', r'\bESTAMP\b', r'\bSTAMP\b'
-    ],
-    'ID / CNIC': [
-        r'\bCNIC\b', r'\bNIC\b', r'\bID\b', r'\bNTN\b',
-        r'^ID\s*[BF]$', r'\bPASSPORT\b'
-    ],
-    'AFFIDAVIT': [
-        r'\bAFFIDAVIT\b', r'\bAFFIDVITE\b'
-    ],
-    'POA': [
-        r'POWER\s*OF\s*ATTORNEY', r'WAQALATNAMA', r'\bPOA\b',
-        r'AUTHORITY\s*LETTER'
-    ],
-    'LEDGER': [
-        r'\bLEDGER\b', r'LED-PERONALS', r'DB\s*JOURNALS',
-        r'JOURNAL\s*\d+', r'FBR\s*LIST'
-    ],
-    'DATA SHEET': [
-        r'DATA\s*SHEET', r'DATA\s*SHEET\s*PRINT', r'X000\s*COMPANY\s*DATA\s*SHEET'
+    "CERTIFICATE": [
+        r"\bCERTIFICATE\b", r"CERTIFICATE\s*WITH\s*SIGN",
+        r"ORIGINAL\s*CERTIFICATE", r"TRADE\s*MARK\s*CERTIFICATE",
+        r"RENEWAL\s*CERTIFICATE",
     ],
 }
 
-# Column order for export
-ALL_COLUMNS = [
+# Keywords that identify company-type data sheets → COMPANY instead of NTN
+_COMPANY_KW = [r"\bPVT\b", r"\bPRIVATE\b", r"PVT\s*LTD", r"\bLIMITED\b",
+               r"\bLTD\b", r"\bSMC\b", r"\bINC\b", r"\bCORPORATION\b"]
+
+# Base column order for exports
+BASE_COLUMNS = [
     "CLIENT NUMBER", "CLIENT NAME", "CASE #", "CASE NAME", "TM NO", "CLASS",
     "FILES", "EXT",
     "TM-1", "TM-48", "EXAM", "ACK", "ACCEPTANCE", "D-NOTE",
-    "TM-16", "TM-50", "TM-06", "COMPANY", "OPPO", "PUB", "CERTIFICATE",
-    "LEGAL NOTICE", "E-STAMP", "ID / CNIC", "AFFIDAVIT", "POA", "LEDGER",
-    "DATA SHEET",
-    "DATE ADDED"
+    "TM-16", "TM-50", "TM-06", "COMPANY", "NTN", "OPPO", "PUB", "CERTIFICATE",
+    "DATE ADDED",
 ]
 
-SHEET_HEADERS = [
-    "📋 CLIENT NUMBER", "👤 CLIENT NAME", "📁 CASE #", "📝 CASE NAME",
-    "🔢 TM NO", "📚 CLASS", "📎 FILES", "📄 EXT",
-    "📄 TM-1", "📄 TM-48", "📝 EXAM", "✅ ACK", "✅ ACCEPTANCE",
-    "📋 D-NOTE", "📄 TM-16", "📄 TM-50", "📄 TM-06",
-    "🏢 COMPANY", "❌ OPPO", "📰 PUB", "📜 CERTIFICATE",
-    "⚖️ LEGAL NOTICE", "📮 E-STAMP", "🪪 ID / CNIC", "📃 AFFIDAVIT",
-    "✍️ POA", "📒 LEDGER", "📊 DATA SHEET",
-    "📅 DATE ADDED"
-]
+# ══════════════════════════════════════════════════════════════════════════════
+#  CUSTOM RULES — persistence
+# ══════════════════════════════════════════════════════════════════════════════
+
+def load_custom_rules() -> list:
+    if os.path.exists(RULES_FILE):
+        try:
+            with open(RULES_FILE, "r", encoding="utf-8") as fh:
+                return json.load(fh)
+        except Exception:
+            pass
+    return []
 
 
-def check_file_patterns(file_names):
-    """Check file names against all patterns and return tickmarks."""
-    file_list = file_names.split('\n') if file_names else []
-    all_files_text = " ".join(file_list)
+def save_custom_rules(rules: list) -> None:
+    with open(RULES_FILE, "w", encoding="utf-8") as fh:
+        json.dump(rules, fh, indent=2, ensure_ascii=False)
 
-    def _match(text, pattern_list):
-        if not text:
-            return False
-        text = str(text).upper()
-        return any(re.search(p, text, re.IGNORECASE) for p in pattern_list)
 
-    return {
-        cat: "✓" if _match(all_files_text, pats) else ""
-        for cat, pats in ALL_PATTERNS.items()
-    }
+def get_active_patterns() -> dict:
+    """Merge default rules with any saved custom rules."""
+    patterns = {k: list(v) for k, v in DEFAULT_PATTERNS.items()}
+    for rule in load_custom_rules():
+        name = rule.get("name", "").strip()
+        pats = rule.get("patterns", [])
+        if name and pats:
+            patterns.setdefault(name, []).extend(pats)
+    return patterns
+
+
+def get_all_columns() -> list:
+    """Return full column list, inserting custom-rule columns before DATE ADDED."""
+    cols = list(BASE_COLUMNS)
+    for rule in load_custom_rules():
+        name = rule.get("name", "").strip()
+        if name and name not in cols:
+            cols.insert(-1, name)   # before DATE ADDED
+    return cols
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  DIRECTORY PROCESSING  (deep or fast scan)
+#  FOLDER PARSING
 # ══════════════════════════════════════════════════════════════════════════════
 
-def process_directory(base_path, prefix_to_remove, max_records=None, deep_scan=True):
-    """
-    Scan base_path and return a list of record dicts.
-    deep_scan=True  → recursive os.walk (finds all nested files)
-    deep_scan=False → strict 2-level scan (Client / Case) — much faster on large drives
-    """
+def parse_client_folder(name: str):
+    m = re.match(r"^([A-Z]-\d+)\s+(.+)$", name)
+    return (m.group(1), m.group(2)) if m else ("", name)
+
+
+def parse_case_folder(name: str):
+    parts = name.split()
+    case_no = case_name = tm_no = cls = ""
+    for p in parts:
+        if re.match(r"^[A-Z]\d{3}-\d{3}$", p):            case_no = p
+        elif case_no and not case_name and re.match(r"^[A-Z][a-zA-Z]+$", p):
+            case_name = p
+        elif re.match(r"^\d{6}$", p):                      tm_no = p
+        elif re.match(r"^C\d+$", p):                       cls = p
+    return case_no, case_name, tm_no, cls
+
+
+def extract_full_case_name(folder: str, tm_no: str) -> str:
+    if not tm_no or not re.search(rf"\b{tm_no}\b", folder):
+        return ""
+    parts = folder.split()
+    out, found = [], False
+    for p in parts:
+        if re.match(r"^[A-Z]\d{3}-\d{3}$", p):   found = True;  continue
+        if found:
+            if p == tm_no:                          break
+            if not re.match(r"^C\d+$", p):         out.append(p)
+    return " ".join(out)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  PATTERN MATCHING
+# ══════════════════════════════════════════════════════════════════════════════
+
+def check_file_patterns(file_names: str) -> dict:
+    file_list  = file_names.split("\n") if file_names else []
+    all_text   = " ".join(file_list)
+    patterns   = get_active_patterns()
+
+    def _hit(pats):
+        return any(re.search(p, all_text, re.IGNORECASE) for p in pats)
+
+    results = {cat: ("✓" if _hit(pats) else "") for cat, pats in patterns.items()}
+
+    # Special logic: DATA SHEET + company keyword → COMPANY (clear NTN if only from data sheet)
+    has_ds = bool(re.search(r"DATA\s*SHEET", all_text, re.IGNORECASE))
+    has_co_kw = any(re.search(p, all_text, re.IGNORECASE) for p in _COMPANY_KW)
+    pure_ntn_pats = [r"\bNTN\b", r"\bCNIC\b", r"\bNIC\b", r"\bPASSPORT\b", r"\bID\s*[BF]?\b"]
+
+    if has_ds and has_co_kw:
+        results["COMPANY"] = "✓"
+        if not any(re.search(p, all_text, re.IGNORECASE) for p in pure_ntn_pats):
+            results["NTN"] = ""   # data sheet was the only NTN trigger → goes to COMPANY
+
+    return results
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  DIRECTORY PROCESSING
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _collect_files(file_list):
+    out = []
+    for f in file_list:
+        if f.lower() == "desktop.ini":
+            continue
+        name, ext = os.path.splitext(f)
+        if ext.lower() == ".ini":
+            ext = ""
+        out.append(f"{name}|{ext.lstrip('.')}")
+    return out
+
+
+def process_directory(base_path, _prefix, max_records=None, deep_scan=True):
+    """Scan base_path and return list of record dicts."""
     case_groups = {}
-    processed_count = 0
+    count = 0
 
     if deep_scan:
-        # ── Recursive scan ─────────────────────────────────────────────────
-        for root, dirs, files in os.walk(base_path):
-            if max_records and processed_count >= max_records:
+        for root, _dirs, files in os.walk(base_path):
+            if max_records and count >= max_records:
                 break
             if not files:
                 continue
-
-            rel_path = os.path.relpath(root, base_path)
-            components = [] if rel_path == '.' else rel_path.split(os.sep)
-
-            client_folder = components[0] if len(components) > 0 else ""
-            case_folder   = components[1] if len(components) > 1 else ""
-
-            client_number, client_name = (
-                parse_client_folder(client_folder) if client_folder
-                else ("", "Root/Uncategorized")
-            )
-            case_no, case_name, tm_no, class_code = (
-                parse_case_folder(case_folder) if case_folder
-                else ("", "No Case Folder", "", "")
-            )
-
-            if tm_no and case_folder:
-                full = extract_full_case_name(case_folder, tm_no)
+            rel   = os.path.relpath(root, base_path)
+            comps = [] if rel == "." else rel.split(os.sep)
+            cf    = comps[0] if comps else ""
+            ff    = comps[1] if len(comps) > 1 else ""
+            cn, cln = parse_client_folder(cf) if cf else ("", "Root/Uncategorized")
+            no, nm, tm, cls = parse_case_folder(ff) if ff else ("", "—", "", "")
+            if tm and ff:
+                full = extract_full_case_name(ff, tm)
                 if full:
-                    case_name = full
-
-            case_key  = (client_number, client_name, case_no, case_name, tm_no, class_code)
-            valid_files = _collect_files(files)
-
-            if valid_files:
-                if case_key not in case_groups:
-                    case_groups[case_key] = []
-                    processed_count += 1
-                case_groups[case_key].extend(valid_files)
+                    nm = full
+            key = (cn, cln, no, nm, tm, cls)
+            vf  = _collect_files(files)
+            if vf:
+                if key not in case_groups:
+                    case_groups[key] = []
+                    count += 1
+                case_groups[key].extend(vf)
     else:
-        # ── Fast 2-level scan ──────────────────────────────────────────────
-        for client_folder in os.listdir(base_path):
-            if max_records and processed_count >= max_records:
+        for cf in os.listdir(base_path):
+            if max_records and count >= max_records:
                 break
-            client_path = os.path.join(base_path, client_folder)
-            if not os.path.isdir(client_path):
+            cp = os.path.join(base_path, cf)
+            if not os.path.isdir(cp):
                 continue
-
-            client_number, client_name = parse_client_folder(client_folder)
-
-            for case_folder in os.listdir(client_path):
-                if max_records and processed_count >= max_records:
+            cn, cln = parse_client_folder(cf)
+            for ff in os.listdir(cp):
+                if max_records and count >= max_records:
                     break
-                case_path = os.path.join(client_path, case_folder)
-                if not os.path.isdir(case_path):
+                fp = os.path.join(cp, ff)
+                if not os.path.isdir(fp):
                     continue
-
-                case_no, case_name, tm_no, class_code = parse_case_folder(case_folder)
-                full = extract_full_case_name(case_folder, tm_no)
+                no, nm, tm, cls = parse_case_folder(ff)
+                full = extract_full_case_name(ff, tm)
                 if full:
-                    case_name = full
+                    nm = full
+                key = (cn, cln, no, nm, tm, cls)
+                vf  = _collect_files(os.listdir(fp))
+                if key not in case_groups:
+                    case_groups[key] = []
+                    count += 1
+                case_groups[key].extend(vf)
 
-                case_key = (client_number, client_name, case_no, case_name, tm_no, class_code)
-                valid_files = _collect_files(os.listdir(case_path))
-
-                if case_key not in case_groups:
-                    case_groups[case_key] = []
-                    processed_count += 1
-                case_groups[case_key].extend(valid_files)
-
-    # ── Build records ──────────────────────────────────────────────────────
     records = []
-    for (client_number, client_name, case_no, case_name, tm_no, class_code), files in case_groups.items():
-        file_names = "\n".join([f.split("|")[0] for f in files if f.split("|")[0]])
-        file_exts  = "\n".join([f.split("|")[1] for f in files if f.split("|")[1]])
-
-        record = {
-            "CLIENT NUMBER": client_number,
-            "CLIENT NAME":   client_name,
-            "CASE #":        case_no,
-            "CASE NAME":     case_name,
-            "TM NO":         tm_no,
-            "CLASS":         class_code,
-            "FILES":         file_names,
-            "EXT":           file_exts,
+    for (cn, cln, no, nm, tm, cls), files in case_groups.items():
+        fnames = "\n".join(f.split("|")[0] for f in files if f.split("|")[0])
+        fexts  = "\n".join(f.split("|")[1] for f in files if f.split("|")[1])
+        rec = {
+            "CLIENT NUMBER": cn,   "CLIENT NAME": cln,
+            "CASE #":        no,   "CASE NAME":   nm,
+            "TM NO":         tm,   "CLASS":        cls,
+            "FILES":         fnames, "EXT":        fexts,
             "DATE ADDED":    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         }
-        record.update(check_file_patterns(file_names))
-        records.append(record)
-
+        rec.update(check_file_patterns(fnames))
+        records.append(rec)
     return records
-
-
-def _collect_files(file_list):
-    """Filter + format a list of file names to 'name|ext' pairs."""
-    result = []
-    for f in file_list:
-        if f.lower() == 'desktop.ini':
-            continue
-        name, ext = os.path.splitext(f)
-        if ext.lower() == '.ini':
-            ext = ''
-        result.append(f"{name}|{ext.lstrip('.')}")
-    return result
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  GOOGLE SHEETS
 # ══════════════════════════════════════════════════════════════════════════════
 
-def get_google_sheets_client():
-    """Initialize Google Sheets client using credentials.json next to this script."""
-    try:
-        creds_path = str(BASE_DIR / "credentials.json")
-        if not os.path.exists(creds_path):
-            return None, f"❌ credentials.json not found at: {creds_path}"
-        creds  = Credentials.from_service_account_file(creds_path, scopes=SCOPES)
-        client = gspread.authorize(creds)
-        return client, None
-    except Exception as e:
-        return None, f"Error connecting to Google Sheets: {e}"
+_HEADER_EMOJI = {
+    "CLIENT NUMBER": "📋", "CLIENT NAME": "👤", "CASE #": "📁",
+    "CASE NAME": "📝", "TM NO": "🔢", "CLASS": "📚",
+    "FILES": "📎", "EXT": "📄", "TM-1": "📄", "TM-48": "📄",
+    "EXAM": "📝", "ACK": "✅", "ACCEPTANCE": "✅", "D-NOTE": "📋",
+    "TM-16": "📄", "TM-50": "📄", "TM-06": "📄",
+    "COMPANY": "🏢", "NTN": "🪪", "OPPO": "⚖️",
+    "PUB": "📰", "CERTIFICATE": "📜", "DATE ADDED": "📅",
+}
 
 
-def setup_sheet_headers(sheet):
-    """Create / reset worksheet headers."""
+def get_gs_client():
+    cp = str(BASE_DIR / "credentials.json")
+    if not os.path.exists(cp):
+        return None, f"❌ credentials.json not found at {cp}"
     try:
-        try:
-            worksheet = sheet.worksheet(SHEET_NAME)
-        except gspread.exceptions.WorksheetNotFound:
-            worksheet = sheet.add_worksheet(title=SHEET_NAME, rows="2000", cols=str(len(SHEET_HEADERS)))
-        col_end   = chr(ord('A') + len(SHEET_HEADERS) - 1)
-        worksheet.update(values=[SHEET_HEADERS], range_name=f'A1:{col_end}1')
-        return worksheet, None
-    except Exception as e:
-        return None, str(e)
+        creds = Credentials.from_service_account_file(cp, scopes=SCOPES)
+        return gspread.authorize(creds), None
+    except Exception as exc:
+        return None, str(exc)
 
 
 def upload_to_sheets(records, log_fn=print):
-    """Upload records to Google Sheets."""
-    client, err = get_google_sheets_client()
+    client, err = get_gs_client()
     if err:
         log_fn(err)
         return False
-
     try:
-        sheet = client.open_by_key(SHEET_ID)
-        worksheet, err = setup_sheet_headers(sheet)
-        if err:
-            log_fn(f"❌ Header error: {err}")
-            return False
-        if not records:
-            log_fn("✅ No records to upload.")
-            return True
-
-        data_cols = [c for c in ALL_COLUMNS if c not in ("CLIENT NUMBER", "CLIENT NAME", "CASE #",
-                                                           "CASE NAME", "TM NO", "CLASS", "FILES",
-                                                           "EXT", "DATE ADDED")]
-        data = []
-        for r in records:
-            row = [
-                r.get('CLIENT NUMBER', ''), r.get('CLIENT NAME', ''),
-                r.get('CASE #', ''),        r.get('CASE NAME', ''),
-                r.get('TM NO', ''),         r.get('CLASS', ''),
-                r.get('FILES', ''),         r.get('EXT', ''),
-            ] + [r.get(c, '') for c in ALL_PATTERNS.keys()] + [r.get('DATE ADDED', '')]
-            data.append(row)
-
-        worksheet.append_rows(data)
+        sh   = client.open_by_key(SHEET_ID)
+        cols = get_all_columns()
+        hdrs = [f"{_HEADER_EMOJI.get(c, '🔹')} {c}" for c in cols]
+        try:
+            ws = sh.worksheet(SHEET_NAME)
+        except gspread.exceptions.WorksheetNotFound:
+            ws = sh.add_worksheet(SHEET_NAME, rows=2000, cols=len(hdrs))
+        end_col = chr(64 + len(hdrs)) if len(hdrs) <= 26 else "A" + chr(64 + len(hdrs) - 26)
+        ws.update(values=[hdrs], range_name=f"A1:{end_col}1")
+        data = [[r.get(c, "") for c in cols] for r in records]
+        ws.append_rows(data)
         log_fn(f"✅ Uploaded {len(records)} records to Google Sheets")
         return True
-    except Exception as e:
-        log_fn(f"❌ Google Sheets error: {e}")
+    except Exception as exc:
+        log_fn(f"❌ Sheets error: {exc}")
         return False
 
 
@@ -394,7 +365,7 @@ def upload_to_sheets(records, log_fn=print):
 #  LOCAL EXPORT
 # ══════════════════════════════════════════════════════════════════════════════
 
-SHORT_NAMES = {
+_SHORT = {
     "consultants_data": "cons_patterns",
     "clients_data":     "clients_patterns",
     "all_data":         "all_patterns",
@@ -402,202 +373,516 @@ SHORT_NAMES = {
 }
 
 
-def export_local(records, filename_prefix, log_fn=print):
-    """Export records to Excel + CSV."""
+def export_local(records, prefix, log_fn=print):
     if not records:
-        log_fn("No records to export!")
+        log_fn("No records!")
         return
-
-    df = pd.DataFrame(records)
-    # Only keep columns that exist in the dataframe
-    existing_cols = [c for c in ALL_COLUMNS if c in df.columns]
-    df = df[existing_cols]
-
-    short = SHORT_NAMES.get(filename_prefix, filename_prefix)
-    excel_path = os.path.join(EXPORT_DIR, f"{short}.xlsx")
-    csv_path   = os.path.join(EXPORT_DIR, f"{short}.csv")
-
-    df.to_excel(excel_path, index=False, engine='openpyxl')
-    df.to_csv(csv_path, index=False)
-
+    df   = pd.DataFrame(records)
+    cols = [c for c in get_all_columns() if c in df.columns]
+    df   = df[cols]
+    short = _SHORT.get(prefix, prefix)
+    xlsx  = os.path.join(EXPORT_DIR, f"{short}.xlsx")
+    csv   = os.path.join(EXPORT_DIR, f"{short}.csv")
+    df.to_excel(xlsx, index=False, engine="openpyxl")
+    df.to_csv(csv, index=False)
     log_fn(f"💾 Exported {len(df)} records")
-    log_fn(f"   📊 Excel: {excel_path}")
-    log_fn(f"   📄 CSV:   {csv_path}")
+    log_fn(f"   📊 Excel → {xlsx}")
+    log_fn(f"   📄 CSV   → {csv}")
 
 
-def handle_upload(records, filename_prefix, export_local_flag, export_sheets_flag, log_fn=print):
-    """Route records to the chosen destinations."""
+def handle_upload(records, prefix, do_local, do_sheets, log_fn=print):
     if not records:
-        log_fn("❌ No records to process!")
+        log_fn("❌ No records found!")
         return
-    if export_local_flag:
-        export_local(records, filename_prefix, log_fn)
-    if export_sheets_flag:
+    if do_local:
+        export_local(records, prefix, log_fn)
+    if do_sheets:
         upload_to_sheets(records, log_fn)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  CUSTOMTKINTER GUI
+#  GUI HELPER WIDGETS
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _shadow_card(master, fg=None, shadow=5, **grid_kw):
+    """Returns a frame styled as a Neo-Brutalist hard-shadow card."""
+    wrapper = ctk.CTkFrame(master, fg_color=C["black"], corner_radius=0)
+    wrapper.grid(**grid_kw)
+    inner = ctk.CTkFrame(wrapper, fg_color=fg or C["panel"],
+                          corner_radius=0, border_width=2, border_color=C["black"])
+    inner.pack(padx=(0, shadow), pady=(0, shadow), fill="both", expand=True)
+    return inner
+
+
+def _nb_btn(master, text, cmd, fg=None, tc=None, **grid_kw):
+    """Neo-Brutalist button."""
+    btn = ctk.CTkButton(
+        master, text=text, command=cmd,
+        fg_color=fg or C["accent"],
+        hover_color=C["teal"],
+        text_color=tc or C["white"],
+        font=ctk.CTkFont(family="Arial Black", size=12, weight="bold"),
+        corner_radius=0, border_width=2, border_color=C["black"], height=40,
+    )
+    btn.grid(**grid_kw)
+    return btn
+
+
+def _nb_label(master, text, size=12, weight="bold", color=None, **grid_kw):
+    lbl = ctk.CTkLabel(
+        master, text=text,
+        font=ctk.CTkFont(family="Arial Black", size=size, weight=weight),
+        text_color=color or C["black"],
+    )
+    lbl.grid(**grid_kw)
+    return lbl
+
+
+def _nb_entry(master, var=None, ph="", width=200, **grid_kw):
+    e = ctk.CTkEntry(
+        master, textvariable=var, placeholder_text=ph,
+        fg_color=C["panel"], border_color=C["black"], border_width=2,
+        corner_radius=0, text_color=C["black"],
+        font=ctk.CTkFont(family="Arial", size=12), width=width,
+    )
+    e.grid(**grid_kw)
+    return e
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  MAIN APPLICATION
 # ══════════════════════════════════════════════════════════════════════════════
 
 class DriveDataApp(ctk.CTk):
     def __init__(self):
         super().__init__()
+        self.title("DRIVE DATA — PATTERN MATCHER")
+        self.geometry("1000x820")
+        self.minsize(860, 700)
+        self.configure(fg_color=C["bg"])
 
-        # ── Window setup ──────────────────────────────────────────────────
-        self.title("🗂️ Drive Folders — Pattern Matcher")
-        self.geometry("900x760")
-        self.minsize(820, 680)
-        self.resizable(True, True)
+        # State
+        self._running      = False
+        self.clients_path  = ctk.StringVar(value=DEFAULT_CLIENTS_PATH)
+        self.conslt_path   = ctk.StringVar(value=DEFAULT_CONSULTANTS_PATH)
+        self.custom_path   = ctk.StringVar(value="")
+        self.max_rec_var   = ctk.StringVar(value="")
+        self.deep_scan_var = ctk.BooleanVar(value=True)
+        self.loc_var       = ctk.BooleanVar(value=True)
+        self.sht_var       = ctk.BooleanVar(value=True)
 
-        # State vars
-        self._running = False
-        self.clients_path     = ctk.StringVar(value=DEFAULT_CLIENTS_PATH)
-        self.consultants_path = ctk.StringVar(value=DEFAULT_CONSULTANTS_PATH)
-        self.custom_path      = ctk.StringVar(value="")
-        self.max_records_var  = ctk.StringVar(value="")   # empty = all
-        self.deep_scan_var    = ctk.BooleanVar(value=True)
-        self.export_local_var  = ctk.BooleanVar(value=True)
-        self.export_sheets_var = ctk.BooleanVar(value=True)
-
+        self._tab_btns  = {}
+        self._tab_pages = {}
         self._build_ui()
 
-    # ── UI Construction ───────────────────────────────────────────────────
+    # ─── UI Construction ─────────────────────────────────────────────────────
 
     def _build_ui(self):
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(3, weight=1)
+        self.grid_rowconfigure(2, weight=1)
 
-        # ─ Header ─────────────────────────────────────────────────────────
-        hdr = ctk.CTkFrame(self, corner_radius=12, fg_color=("#1a1a2e", "#1a1a2e"))
-        hdr.grid(row=0, column=0, sticky="ew", padx=16, pady=(16, 8))
+        # ── Sticky dark header ─────────────────────────────────────────────
+        hdr = ctk.CTkFrame(self, fg_color=C["black"], corner_radius=0, height=58)
+        hdr.grid(row=0, column=0, sticky="ew")
+        hdr.grid_propagate(False)
         hdr.grid_columnconfigure(0, weight=1)
 
-        ctk.CTkLabel(hdr, text="🗂️  Drive Folders — Pattern Matcher",
-                     font=ctk.CTkFont(family="Segoe UI", size=22, weight="bold"),
-                     text_color="#60a5fa").grid(row=0, column=0, pady=(14, 2))
-        ctk.CTkLabel(hdr,
-                     text=f"20 pattern rules  •  Deep & Fast scan modes  •  Google Sheets + Local export",
-                     font=ctk.CTkFont(size=12), text_color="#94a3b8").grid(row=1, column=0, pady=(0, 14))
+        ctk.CTkLabel(
+            hdr, text="🗂  DRIVE DATA — PATTERN MATCHER",
+            font=ctk.CTkFont(family="Arial Black", size=19, weight="bold"),
+            text_color=C["panel"],
+        ).grid(row=0, column=0, sticky="w", padx=20, pady=0)
 
-        # ─ Config Panel ───────────────────────────────────────────────────
-        cfg = ctk.CTkFrame(self, corner_radius=12)
-        cfg.grid(row=1, column=0, sticky="ew", padx=16, pady=4)
-        cfg.grid_columnconfigure(1, weight=1)
+        badge_frame = ctk.CTkFrame(hdr, fg_color=C["accent"], corner_radius=0)
+        badge_frame.grid(row=0, column=1, padx=(0, 16))
+        ctk.CTkLabel(
+            badge_frame,
+            text=f"  v2.0 · {len(get_active_patterns())} RULES  ",
+            font=ctk.CTkFont(family="Arial", size=10, weight="bold"),
+            text_color=C["white"],
+        ).pack(padx=2, pady=6)
 
-        # Paths
-        self._path_row(cfg, "📁 Clients Path",      self.clients_path,     0, self._browse_clients)
-        self._path_row(cfg, "📁 Consultants Path",  self.consultants_path, 1, self._browse_consultants)
-        self._path_row(cfg, "📂 Custom Path",        self.custom_path,      2, self._browse_custom)
+        # ── Tab bar ────────────────────────────────────────────────────────
+        tab_bar = ctk.CTkFrame(self, fg_color=C["bg_alt"], corner_radius=0, height=40)
+        tab_bar.grid(row=1, column=0, sticky="ew")
+        tab_bar.grid_propagate(False)
 
-        # Options row
-        opt = ctk.CTkFrame(cfg, fg_color="transparent")
-        opt.grid(row=3, column=0, columnspan=3, sticky="ew", padx=12, pady=(6, 10))
-        opt.grid_columnconfigure((0, 1, 2, 3, 4), weight=1)
-
-        ctk.CTkLabel(opt, text="Max Records (blank = all):",
-                     font=ctk.CTkFont(size=12)).grid(row=0, column=0, sticky="e", padx=(0, 6))
-        ctk.CTkEntry(opt, textvariable=self.max_records_var, width=90,
-                     placeholder_text="e.g. 200").grid(row=0, column=1, sticky="w")
-
-        ctk.CTkSwitch(opt, text="🔍 Deep Scan", variable=self.deep_scan_var,
-                      onvalue=True, offvalue=False,
-                      font=ctk.CTkFont(size=12)).grid(row=0, column=2, padx=20)
-
-        ctk.CTkCheckBox(opt, text="💾 Export Local",
-                        variable=self.export_local_var,
-                        font=ctk.CTkFont(size=12)).grid(row=0, column=3, padx=8)
-        ctk.CTkCheckBox(opt, text="🌐 Google Sheets",
-                        variable=self.export_sheets_var,
-                        font=ctk.CTkFont(size=12)).grid(row=0, column=4, padx=8)
-
-        # ─ Action Buttons ─────────────────────────────────────────────────
-        btn_frame = ctk.CTkFrame(self, corner_radius=12)
-        btn_frame.grid(row=2, column=0, sticky="ew", padx=16, pady=4)
-        btn_frame.grid_columnconfigure((0, 1, 2, 3, 4), weight=1)
-
-        btn_spec = [
-            ("👥 ALL CLIENTS",       "#2563eb", self._run_clients),
-            ("🤝 CONSULTANTS",       "#7c3aed", self._run_consultants),
-            ("📦 BOTH",              "#0f766e", self._run_both),
-            ("📂 CUSTOM PATH",       "#b45309", self._run_custom),
-            ("⚡ Quick Export",      "#1e3a5f", self._run_quick),
+        tabs = [
+            ("scan",     "📁  SCAN"),
+            ("rules",    "⚙  RULES MANAGER"),
+            ("about",    "ℹ  ABOUT"),
         ]
-        for col, (lbl, color, cmd) in enumerate(btn_spec):
-            ctk.CTkButton(btn_frame, text=lbl, fg_color=color,
-                          hover_color=self._darken(color),
-                          font=ctk.CTkFont(size=13, weight="bold"),
-                          height=42, corner_radius=8,
-                          command=cmd).grid(row=0, column=col,
-                                            padx=8, pady=10, sticky="ew")
+        for i, (key, lbl) in enumerate(tabs):
+            btn = ctk.CTkButton(
+                tab_bar, text=lbl, height=40, width=190,
+                fg_color=C["accent"], text_color=C["white"],
+                hover_color=C["teal_lt"],
+                font=ctk.CTkFont(family="Arial Black", size=11, weight="bold"),
+                corner_radius=0, border_width=0,
+                command=lambda k=key: self._switch_tab(k),
+            )
+            btn.place(x=i * 192, y=0)
+            self._tab_btns[key] = btn
 
-        # ─ Progress ───────────────────────────────────────────────────────
-        self.progress = ctk.CTkProgressBar(self, mode="indeterminate", height=6)
-        self.progress.grid(row=3, column=0, sticky="ew", padx=16, pady=(0, 2))
+        # ── Content container ──────────────────────────────────────────────
+        content = ctk.CTkFrame(self, fg_color=C["bg"], corner_radius=0)
+        content.grid(row=2, column=0, sticky="nsew")
+        content.grid_columnconfigure(0, weight=1)
+        content.grid_rowconfigure(0, weight=1)
+
+        for key, build_fn in [
+            ("scan",  self._build_scan),
+            ("rules", self._build_rules),
+            ("about", self._build_about),
+        ]:
+            page = ctk.CTkFrame(content, fg_color=C["bg"], corner_radius=0)
+            page.grid(row=0, column=0, sticky="nsew")
+            page.grid_columnconfigure(0, weight=1)
+            page.grid_rowconfigure(0, weight=1)
+            self._tab_pages[key] = page
+            build_fn(page)
+
+        self._switch_tab("scan")
+
+    def _switch_tab(self, key):
+        self._tab_pages[key].tkraise()
+        for k, btn in self._tab_btns.items():
+            btn.configure(
+                fg_color=C["accent"] if k == key else C["bg_alt"],
+                text_color=C["white"] if k == key else C["black"],
+            )
+
+    # ─── SCAN TAB ────────────────────────────────────────────────────────────
+
+    def _build_scan(self, parent):
+        parent.grid_rowconfigure(4, weight=1)
+
+        # Path config
+        cfg = _shadow_card(parent, shadow=5,
+                           row=0, column=0, sticky="ew", padx=18, pady=(18, 6))
+        cfg.grid_columnconfigure(1, weight=1)
+        _nb_label(cfg, "PATH CONFIGURATION", size=10, weight="normal",
+                  color=C["dim"], row=0, column=0, columnspan=3, sticky="w",
+                  padx=14, pady=(10, 2))
+        self._path_row(cfg, "ALL CLIENTS :", self.clients_path, 1, self._browse_clients)
+        self._path_row(cfg, "CONSULTANTS :", self.conslt_path,  2, self._browse_conslt)
+        self._path_row(cfg, "CUSTOM PATH :", self.custom_path,  3, self._browse_custom)
+
+        # Options
+        opts = _shadow_card(parent, fg=C["bg_alt"], shadow=4,
+                            row=1, column=0, sticky="ew", padx=18, pady=4)
+        opts.grid_columnconfigure((0, 1, 2, 3, 4), weight=1)
+
+        _nb_label(opts, "MAX RECORDS:", size=10, weight="normal",
+                  row=0, column=0, padx=(14, 4), pady=10, sticky="e")
+        _nb_entry(opts, var=self.max_rec_var, ph="ALL",
+                  width=80, row=0, column=1, pady=10, sticky="w")
+
+        ctk.CTkSwitch(
+            opts, text="DEEP SCAN", variable=self.deep_scan_var,
+            font=ctk.CTkFont(family="Arial Black", size=11, weight="bold"),
+            button_color=C["accent"], progress_color=C["teal"], text_color=C["black"],
+        ).grid(row=0, column=2, padx=16)
+
+        for col, (lbl, var) in enumerate(
+            [("💾 LOCAL", self.loc_var), ("🌐 SHEETS", self.sht_var)], start=3
+        ):
+            ctk.CTkCheckBox(
+                opts, text=lbl, variable=var,
+                font=ctk.CTkFont(family="Arial Black", size=11, weight="bold"),
+                fg_color=C["accent"], hover_color=C["teal"],
+                border_color=C["black"], text_color=C["black"],
+                checkmark_color=C["white"], corner_radius=0,
+            ).grid(row=0, column=col, padx=12)
+
+        # Action buttons
+        btns = _shadow_card(parent, fg=C["bg_alt"], shadow=4,
+                            row=2, column=0, sticky="ew", padx=18, pady=4)
+        btns.grid_columnconfigure((0, 1, 2, 3, 4), weight=1)
+
+        specs = [
+            ("👥 ALL CLIENTS",  C["black"],   C["white"], self._run_clients),
+            ("🤝 CONSULTANTS",  C["teal"],    C["white"], self._run_conslt),
+            ("📦 BOTH",         C["teal"],    C["white"], self._run_both),
+            ("📂 CUSTOM",       C["accent"],  C["white"], self._run_custom),
+            ("⚡ QUICK EXPORT", C["yellow"],  C["black"], self._run_quick),
+        ]
+        for col, (lbl, fg, tc, cmd) in enumerate(specs):
+            _nb_btn(btns, lbl, cmd, fg=fg, tc=tc,
+                    row=0, column=col, padx=8, pady=10, sticky="ew")
+
+        # Progress bar
+        self.progress = ctk.CTkProgressBar(
+            parent, height=6,
+            fg_color=C["bg_alt"], progress_color=C["accent"], corner_radius=0,
+        )
+        self.progress.grid(row=3, column=0, sticky="ew", padx=18, pady=(2, 0))
         self.progress.set(0)
 
-        # ─ Log Console ────────────────────────────────────────────────────
-        log_frame = ctk.CTkFrame(self, corner_radius=12)
-        log_frame.grid(row=4, column=0, sticky="nsew", padx=16, pady=(2, 16))
-        log_frame.grid_columnconfigure(0, weight=1)
-        log_frame.grid_rowconfigure(1, weight=1)
-        self.grid_rowconfigure(4, weight=1)
+        # Log console
+        log_card = _shadow_card(parent, fg=C["black"], shadow=5,
+                                row=4, column=0, sticky="nsew",
+                                padx=18, pady=(6, 18))
+        log_card.grid_rowconfigure(1, weight=1)
+        log_card.grid_columnconfigure(0, weight=1)
 
-        log_hdr = ctk.CTkFrame(log_frame, fg_color="transparent")
+        log_hdr = ctk.CTkFrame(log_card, fg_color="transparent")
         log_hdr.grid(row=0, column=0, sticky="ew", padx=10, pady=(8, 0))
         log_hdr.grid_columnconfigure(0, weight=1)
-        ctk.CTkLabel(log_hdr, text="📋 Status Log",
-                     font=ctk.CTkFont(size=13, weight="bold"),
-                     text_color="#94a3b8").grid(row=0, column=0, sticky="w")
-        ctk.CTkButton(log_hdr, text="Clear", width=60, height=24,
-                      fg_color="#374151", hover_color="#4b5563",
-                      font=ctk.CTkFont(size=11),
-                      command=self._clear_log).grid(row=0, column=1)
 
-        self.log_box = ctk.CTkTextbox(log_frame, font=ctk.CTkFont(family="Consolas", size=12),
-                                      wrap="word", state="disabled",
-                                      fg_color=("#1e293b", "#0f172a"),
-                                      text_color="#e2e8f0")
+        ctk.CTkLabel(
+            log_hdr, text="STATUS LOG",
+            font=ctk.CTkFont(family="Arial Black", size=11, weight="bold"),
+            text_color=C["teal_lt"],
+        ).grid(row=0, column=0, sticky="w")
+
+        ctk.CTkButton(
+            log_hdr, text="CLEAR", width=64, height=24,
+            fg_color=C["accent"], hover_color=C["teal"],
+            corner_radius=0, border_width=1, border_color=C["white"],
+            font=ctk.CTkFont(family="Arial", size=10, weight="bold"),
+            text_color=C["white"], command=self._clear_log,
+        ).grid(row=0, column=1)
+
+        self.log_box = ctk.CTkTextbox(
+            log_card,
+            font=ctk.CTkFont(family="Consolas", size=12),
+            fg_color=C["black"], text_color=C["teal_lt"],
+            corner_radius=0, wrap="word", state="disabled",
+        )
         self.log_box.grid(row=1, column=0, sticky="nsew", padx=10, pady=(4, 10))
 
-        self._log("✅ Application ready. Select a scan mode above.")
-
-    # ── Path row helper ───────────────────────────────────────────────────
+        self._log("▶  DRIVE DATA PATTERN MATCHER v2.0 — Ready")
+        self._log(f"   {len(get_active_patterns())} active rules · {len(get_all_columns())} export columns")
 
     def _path_row(self, parent, label, var, row, browse_cmd):
-        ctk.CTkLabel(parent, text=label,
-                     font=ctk.CTkFont(size=12, weight="bold"),
-                     width=150, anchor="e").grid(row=row, column=0, padx=(12, 6), pady=4, sticky="e")
-        ctk.CTkEntry(parent, textvariable=var, font=ctk.CTkFont(size=11)
-                     ).grid(row=row, column=1, padx=4, pady=4, sticky="ew")
-        ctk.CTkButton(parent, text="Browse…", width=80, height=28,
-                      fg_color="#374151", hover_color="#4b5563",
-                      font=ctk.CTkFont(size=11),
-                      command=browse_cmd).grid(row=row, column=2, padx=(4, 12), pady=4)
+        ctk.CTkLabel(
+            parent, text=label,
+            font=ctk.CTkFont(family="Arial Black", size=11, weight="bold"),
+            text_color=C["black"], width=130, anchor="e",
+        ).grid(row=row, column=0, padx=(14, 6), pady=4, sticky="e")
 
-    # ── Browse callbacks ──────────────────────────────────────────────────
+        ctk.CTkEntry(
+            parent, textvariable=var,
+            fg_color=C["panel"], border_color=C["black"], border_width=2,
+            corner_radius=0, text_color=C["black"],
+            font=ctk.CTkFont(family="Arial", size=11),
+        ).grid(row=row, column=1, padx=4, pady=4, sticky="ew")
+
+        ctk.CTkButton(
+            parent, text="BROWSE…", width=90, height=28,
+            fg_color=C["bg_alt"], hover_color=C["teal_lt"],
+            text_color=C["black"], corner_radius=0,
+            border_width=2, border_color=C["black"],
+            font=ctk.CTkFont(family="Arial Black", size=10, weight="bold"),
+            command=browse_cmd,
+        ).grid(row=row, column=2, padx=(4, 14), pady=4)
+
+    # ─── RULES MANAGER TAB ───────────────────────────────────────────────────
+
+    def _build_rules(self, parent):
+        parent.grid_rowconfigure(1, weight=1)
+        parent.grid_columnconfigure(0, weight=1)
+
+        _nb_label(parent, "⚙  RULES MANAGER", size=15,
+                  row=0, column=0, sticky="w", padx=20, pady=(16, 4))
+
+        pane = ctk.CTkFrame(parent, fg_color=C["bg"], corner_radius=0)
+        pane.grid(row=1, column=0, sticky="nsew", padx=18, pady=(0, 18))
+        pane.grid_rowconfigure(0, weight=1)
+        pane.grid_columnconfigure((0, 1), weight=1)
+
+        # ── Left: rule list ────────────────────────────────────────────────
+        left = _shadow_card(pane, shadow=5,
+                            row=0, column=0, sticky="nsew", padx=(0, 8), pady=0)
+        left.grid_rowconfigure(1, weight=1)
+        left.grid_columnconfigure(0, weight=1)
+
+        _nb_label(left, "ACTIVE RULES", size=10, weight="normal", color=C["dim"],
+                  row=0, column=0, sticky="w", padx=12, pady=(10, 4))
+
+        self.rules_scroll = ctk.CTkScrollableFrame(left, fg_color=C["panel"],
+                                                    corner_radius=0)
+        self.rules_scroll.grid(row=1, column=0, sticky="nsew", padx=8, pady=(0, 8))
+        self.rules_scroll.grid_columnconfigure(0, weight=1)
+
+        # ── Right: add rule form ───────────────────────────────────────────
+        right = _shadow_card(pane, shadow=5,
+                             row=0, column=1, sticky="nsew", padx=(8, 0), pady=0)
+        right.grid_columnconfigure(0, weight=1)
+
+        _nb_label(right, "ADD CUSTOM RULE", size=10, weight="normal", color=C["dim"],
+                  row=0, column=0, sticky="w", padx=12, pady=(10, 4))
+
+        self._r_name = ctk.StringVar()
+        self._r_tgt  = ctk.StringVar()
+
+        _nb_label(right, "RULE / COLUMN NAME:", size=10, weight="normal",
+                  row=1, column=0, sticky="w", padx=12, pady=(8, 0))
+        _nb_entry(right, var=self._r_name, ph="e.g. MY RULE",
+                  width=240, row=2, column=0, sticky="ew", padx=12, pady=2)
+
+        _nb_label(right, "PATTERNS (one per line, regex ok):", size=10, weight="normal",
+                  row=3, column=0, sticky="w", padx=12, pady=(8, 0))
+        self._r_pats = ctk.CTkTextbox(
+            right, height=100,
+            fg_color=C["panel"], border_color=C["black"], border_width=2,
+            corner_radius=0, text_color=C["black"],
+            font=ctk.CTkFont(family="Consolas", size=11),
+        )
+        self._r_pats.grid(row=4, column=0, sticky="ew", padx=12, pady=2)
+
+        _nb_label(right, "MERGE INTO EXISTING COLUMN (optional):", size=10, weight="normal",
+                  row=5, column=0, sticky="w", padx=12, pady=(8, 0))
+        _nb_entry(right, var=self._r_tgt, ph="e.g. OPPO  (blank = create new)",
+                  width=240, row=6, column=0, sticky="ew", padx=12, pady=2)
+
+        _nb_btn(right, "➕  SAVE RULE", self._save_rule, fg=C["teal"],
+                row=7, column=0, sticky="ew", padx=12, pady=(14, 4))
+        _nb_btn(right, "🔄  RELOAD LIST", self._reload_rules, fg=C["black"],
+                row=8, column=0, sticky="ew", padx=12, pady=4)
+
+        tip = ("ℹ  Tip: patterns use Python regex. Leave TARGET blank\n"
+               "to create a new column. Match to an existing column\n"
+               "name (e.g. OPPO) to extend it.")
+        ctk.CTkLabel(
+            right, text=tip, justify="left",
+            font=ctk.CTkFont(family="Arial", size=10),
+            text_color=C["dim"],
+        ).grid(row=9, column=0, sticky="w", padx=12, pady=(8, 0))
+
+        self._refresh_rules_list()
+
+    def _refresh_rules_list(self):
+        for w in self.rules_scroll.winfo_children():
+            w.destroy()
+
+        row = 0
+        # Built-in rules (read-only display)
+        for name, pats in DEFAULT_PATTERNS.items():
+            self._rule_row(name, f"{len(pats)} pattern(s)", row, is_custom=False)
+            row += 1
+
+        # Custom rules
+        for rule in load_custom_rules():
+            n   = rule.get("name", "?")
+            p   = rule.get("patterns", [])
+            tgt = rule.get("target", n)
+            self._rule_row(n, f"{len(p)} pattern(s)  →  {tgt}", row,
+                           is_custom=True, rule_data=rule)
+            row += 1
+
+    def _rule_row(self, name, subtitle, row, is_custom=False, rule_data=None):
+        bg = "#FFF8E6" if is_custom else C["panel"]
+        f  = ctk.CTkFrame(self.rules_scroll, fg_color=bg, corner_radius=0,
+                           border_width=1, border_color=C["black"])
+        f.grid(row=row, column=0, sticky="ew", pady=2, padx=2)
+        f.grid_columnconfigure(0, weight=1)
+
+        ctk.CTkLabel(
+            f, text=name,
+            font=ctk.CTkFont(family="Arial Black", size=11, weight="bold"),
+            text_color=C["accent"] if is_custom else C["black"],
+        ).grid(row=0, column=0, sticky="w", padx=10, pady=(4, 0))
+
+        ctk.CTkLabel(
+            f, text=subtitle,
+            font=ctk.CTkFont(family="Arial", size=10),
+            text_color=C["dim"],
+        ).grid(row=1, column=0, sticky="w", padx=10, pady=(0, 4))
+
+        if is_custom and rule_data:
+            ctk.CTkButton(
+                f, text="✕", width=28, height=28,
+                fg_color=C["accent"], hover_color="#8B0000",
+                corner_radius=0, font=ctk.CTkFont(size=12),
+                text_color=C["white"],
+                command=lambda rd=rule_data: self._delete_rule(rd),
+            ).grid(row=0, column=1, rowspan=2, padx=8, pady=4)
+
+    def _save_rule(self):
+        name = self._r_name.get().strip().upper()
+        raw  = self._r_pats.get("1.0", "end").strip()
+        tgt  = self._r_tgt.get().strip().upper() or name
+
+        if not name or not raw:
+            messagebox.showwarning("Missing fields",
+                                   "Rule name and at least one pattern are required.")
+            return
+
+        pats  = [p.strip() for p in raw.splitlines() if p.strip()]
+        rules = load_custom_rules()
+        rules.append({"name": tgt, "patterns": pats, "target": tgt})
+        save_custom_rules(rules)
+
+        self._r_name.set("")
+        self._r_pats.delete("1.0", "end")
+        self._r_tgt.set("")
+        self._refresh_rules_list()
+        self._log(f"✅ Custom rule '{name}' saved ({len(pats)} pattern(s)) → column '{tgt}'")
+
+    def _delete_rule(self, rule_data):
+        rules = [r for r in load_custom_rules() if r != rule_data]
+        save_custom_rules(rules)
+        self._refresh_rules_list()
+        self._log(f"🗑  Deleted rule '{rule_data.get('name', '')}'")
+
+    def _reload_rules(self):
+        self._refresh_rules_list()
+        n = len(get_active_patterns())
+        self._log(f"🔄 Rules reloaded — {n} active")
+
+    # ─── ABOUT TAB ────────────────────────────────────────────────────────────
+
+    def _build_about(self, parent):
+        card = _shadow_card(parent, shadow=6,
+                            row=0, column=0, sticky="nsew", padx=40, pady=30)
+        card.grid_columnconfigure(0, weight=1)
+
+        texts = [
+            ("DRIVE DATA — PATTERN MATCHER", 20, C["black"]),
+            ("Version 2.0  ·  Neo-Brutalism Edition", 13, C["dim"]),
+            ("", 10, C["dim"]),
+            ("Scans Google Drive folder structures mounted locally,", 12, C["black"]),
+            ("classifies trademark case files using 14+ regex rules,", 12, C["black"]),
+            ("and exports to Excel, CSV, or Google Sheets.", 12, C["black"]),
+            ("", 10, C["dim"]),
+            ("AUTHOR", 11, C["accent"]),
+            ("Nadeem (OutLawZ)  ·  Brandex Trademark Services", 12, C["black"]),
+            ("net2outlawzz@gmail.com  ·  brandex.pk", 12, C["teal"]),
+            ("", 10, C["dim"]),
+            ("RULES FILE", 11, C["accent"]),
+            (str(RULES_FILE), 11, C["dim"]),
+            ("EXPORT DIR", 11, C["accent"]),
+            (str(EXPORT_DIR), 11, C["dim"]),
+        ]
+
+        for i, (text, size, color) in enumerate(texts):
+            ctk.CTkLabel(
+                card, text=text,
+                font=ctk.CTkFont(family="Arial Black" if size >= 13 else "Arial",
+                                 size=size, weight="bold" if size >= 13 else "normal"),
+                text_color=color,
+            ).grid(row=i, column=0, sticky="w", padx=20, pady=(2 if text else 0, 0))
+
+    # ─── Run helpers ──────────────────────────────────────────────────────────
 
     def _browse_clients(self):
         p = filedialog.askdirectory(title="Select ALL CLIENTS folder")
-        if p:
-            self.clients_path.set(p)
+        if p: self.clients_path.set(p)
 
-    def _browse_consultants(self):
+    def _browse_conslt(self):
         p = filedialog.askdirectory(title="Select CONSULTANTS folder")
-        if p:
-            self.consultants_path.set(p)
+        if p: self.conslt_path.set(p)
 
     def _browse_custom(self):
         p = filedialog.askdirectory(title="Select custom folder")
-        if p:
-            self.custom_path.set(p)
-
-    # ── Log helpers ───────────────────────────────────────────────────────
+        if p: self.custom_path.set(p)
 
     def _log(self, msg):
         ts = datetime.now().strftime("%H:%M:%S")
         self.log_box.configure(state="normal")
-        self.log_box.insert("end", f"[{ts}] {msg}\n")
+        self.log_box.insert("end", f"[{ts}]  {msg}\n")
         self.log_box.see("end")
         self.log_box.configure(state="disabled")
 
@@ -606,163 +891,124 @@ class DriveDataApp(ctk.CTk):
         self.log_box.delete("1.0", "end")
         self.log_box.configure(state="disabled")
 
-    # ── Progress ──────────────────────────────────────────────────────────
-
-    def _start_progress(self):
+    def _start_prog(self):
         self.progress.configure(mode="indeterminate")
         self.progress.start()
 
-    def _stop_progress(self):
+    def _stop_prog(self):
         self.progress.stop()
         self.progress.configure(mode="determinate")
         self.progress.set(1)
 
-    # ── Max records ───────────────────────────────────────────────────────
-
     def _get_max(self):
-        v = self.max_records_var.get().strip()
-        if v.isdigit():
-            return int(v)
-        return None
-
-    # ── Run helpers ───────────────────────────────────────────────────────
+        v = self.max_rec_var.get().strip()
+        return int(v) if v.isdigit() else None
 
     def _guard(self):
         if self._running:
-            self._log("⚠️  A scan is already running. Please wait.")
+            self._log("⚠  Already scanning — please wait.")
             return False
         return True
 
-    def _run_in_thread(self, fn):
-        self._running = True
-        self._start_progress()
-        threading.Thread(target=self._thread_wrapper(fn), daemon=True).start()
-
-    def _thread_wrapper(self, fn):
+    def _wrap(self, fn):
         def wrapper():
             try:
                 fn()
-            except Exception as e:
-                self.after(0, lambda: self._log(f"❌ Unexpected error: {e}"))
+            except Exception as exc:
+                self.after(0, lambda: self._log(f"❌ Error: {exc}"))
             finally:
                 self._running = False
-                self.after(0, self._stop_progress)
+                self.after(0, self._stop_prog)
         return wrapper
 
-    def _get_export_flags(self):
-        return self.export_local_var.get(), self.export_sheets_var.get()
+    def _post(self, msg):
+        self.after(0, lambda m=msg: self._log(m))
 
-    # ── Action buttons ────────────────────────────────────────────────────
+    def _run_thread(self, fn):
+        self._running = True
+        self._start_prog()
+        threading.Thread(target=self._wrap(fn), daemon=True).start()
+
+    def _flags(self):
+        return self.loc_var.get(), self.sht_var.get()
+
+    # ─── Scan actions ─────────────────────────────────────────────────────────
 
     def _run_clients(self):
-        if not self._guard():
-            return
+        if not self._guard(): return
         def job():
-            path = self.clients_path.get()
-            if not os.path.exists(path):
-                self.after(0, lambda: self._log(f"❌ Path not found: {path}"))
-                return
-            self.after(0, lambda: self._log(f"📁 Scanning ALL CLIENTS ({path}) …"))
-            records = process_directory(path, "", self._get_max(), self.deep_scan_var.get())
-            self.after(0, lambda: self._log(f"   ✔ Found {len(records)} record groups"))
-            loc, sht = self._get_export_flags()
-            handle_upload(records, "clients_data", loc, sht, lambda m: self.after(0, lambda: self._log(m)))
-        self._run_in_thread(job)
+            p = self.clients_path.get()
+            if not os.path.exists(p): self._post(f"❌ Not found: {p}"); return
+            self._post("📁 Scanning ALL CLIENTS …")
+            recs = process_directory(p, "", self._get_max(), self.deep_scan_var.get())
+            self._post(f"   ✔ {len(recs)} record groups found")
+            handle_upload(recs, "clients_data", *self._flags(), self._post)
+        self._run_thread(job)
 
-    def _run_consultants(self):
-        if not self._guard():
-            return
+    def _run_conslt(self):
+        if not self._guard(): return
         def job():
-            path = self.consultants_path.get()
-            if not os.path.exists(path):
-                self.after(0, lambda: self._log(f"❌ Path not found: {path}"))
-                return
-            self.after(0, lambda: self._log(f"📁 Scanning CONSULTANTS ({path}) …"))
-            records = process_directory(path, "", self._get_max(), self.deep_scan_var.get())
-            self.after(0, lambda: self._log(f"   ✔ Found {len(records)} record groups"))
-            loc, sht = self._get_export_flags()
-            handle_upload(records, "consultants_data", loc, sht, lambda m: self.after(0, lambda: self._log(m)))
-        self._run_in_thread(job)
+            p = self.conslt_path.get()
+            if not os.path.exists(p): self._post(f"❌ Not found: {p}"); return
+            self._post("🤝 Scanning CONSULTANTS …")
+            recs = process_directory(p, "", self._get_max(), self.deep_scan_var.get())
+            self._post(f"   ✔ {len(recs)} record groups found")
+            handle_upload(recs, "consultants_data", *self._flags(), self._post)
+        self._run_thread(job)
 
     def _run_both(self):
-        if not self._guard():
-            return
+        if not self._guard(): return
         def job():
-            all_records = []
-            for path, label, prefix in [
-                (self.clients_path.get(),     "ALL CLIENTS",  "all_data"),
-                (self.consultants_path.get(), "CONSULTANTS",  "all_data"),
-            ]:
+            all_recs = []
+            for path, label in [(self.clients_path.get(), "ALL CLIENTS"),
+                                 (self.conslt_path.get(), "CONSULTANTS")]:
                 if os.path.exists(path):
-                    self.after(0, lambda l=label: self._log(f"📁 Scanning {l} …"))
+                    self._post(f"📦 Scanning {label} …")
                     r = process_directory(path, "", self._get_max(), self.deep_scan_var.get())
-                    all_records.extend(r)
-                    self.after(0, lambda n=len(r), l=label: self._log(f"   ✔ {n} groups from {l}"))
+                    all_recs.extend(r)
+                    self._post(f"   ✔ {len(r)} from {label}")
                 else:
-                    self.after(0, lambda p=path: self._log(f"❌ Not found: {p}"))
-            loc, sht = self._get_export_flags()
-            handle_upload(all_records, "all_data", loc, sht, lambda m: self.after(0, lambda: self._log(m)))
-        self._run_in_thread(job)
+                    self._post(f"❌ Not found: {path}")
+            handle_upload(all_recs, "all_data", *self._flags(), self._post)
+        self._run_thread(job)
 
     def _run_custom(self):
-        if not self._guard():
-            return
+        if not self._guard(): return
         def job():
-            path = self.custom_path.get().strip()
-            if not path:
-                self.after(0, lambda: self._log("❌ Custom path is empty. Use Browse… to select a folder."))
-                return
-            if not os.path.exists(path):
-                self.after(0, lambda: self._log(f"❌ Path not found: {path}"))
-                return
-            self.after(0, lambda: self._log(f"📂 Scanning custom path ({path}) …"))
-            records = process_directory(path, "", self._get_max(), self.deep_scan_var.get())
-            self.after(0, lambda: self._log(f"   ✔ Found {len(records)} record groups"))
-            loc, sht = self._get_export_flags()
-            handle_upload(records, "custom_data", loc, sht, lambda m: self.after(0, lambda: self._log(m)))
-        self._run_in_thread(job)
+            p = self.custom_path.get().strip()
+            if not p:              self._post("❌ Custom path is empty."); return
+            if not os.path.exists(p): self._post(f"❌ Not found: {p}"); return
+            self._post(f"📂 Scanning: {p}")
+            recs = process_directory(p, "", self._get_max(), self.deep_scan_var.get())
+            self._post(f"   ✔ {len(recs)} record groups found")
+            handle_upload(recs, "custom_data", *self._flags(), self._post)
+        self._run_thread(job)
 
     def _run_quick(self):
-        """Quick export — fast 2-level scan, local files only, no pattern matching."""
-        if not self._guard():
-            return
+        if not self._guard(): return
         def job():
-            all_records = []
-            for path, label in [
-                (self.clients_path.get(),     "ALL CLIENTS"),
-                (self.consultants_path.get(), "CONSULTANTS"),
-            ]:
+            all_recs = []
+            for path, label in [(self.clients_path.get(), "ALL CLIENTS"),
+                                 (self.conslt_path.get(), "CONSULTANTS")]:
                 if os.path.exists(path):
-                    self.after(0, lambda l=label: self._log(f"⚡ Quick scan {l} …"))
+                    self._post(f"⚡ Quick scan {label} …")
                     r = process_directory(path, "", None, deep_scan=False)
-                    all_records.extend(r)
-                    self.after(0, lambda n=len(r), l=label: self._log(f"   ✔ {n} from {l}"))
+                    all_recs.extend(r)
+                    self._post(f"   ✔ {len(r)} groups")
                 else:
-                    self.after(0, lambda p=path: self._log(f"❌ Not found: {p}"))
-
-            if all_records:
-                df = pd.DataFrame(all_records)
-                base_cols = ["CLIENT NUMBER", "CLIENT NAME", "CASE #", "CASE NAME",
-                             "TM NO", "CLASS", "FILES", "EXT", "DATE ADDED"]
-                existing  = [c for c in base_cols if c in df.columns]
-                df = df[existing]
-                out_xlsx = os.path.join(EXPORT_DIR, "drive_data_export.xlsx")
-                out_csv  = os.path.join(EXPORT_DIR, "drive_data_export.csv")
-                df.to_excel(out_xlsx, index=False, engine='openpyxl')
-                df.to_csv(out_csv, index=False)
-                self.after(0, lambda: self._log(f"✅ Quick export done — {len(all_records)} records"))
-                self.after(0, lambda: self._log(f"   📊 {out_xlsx}"))
-            else:
-                self.after(0, lambda: self._log("⚠️  No records found."))
-        self._run_in_thread(job)
-
-    # ── Colour utility ────────────────────────────────────────────────────
-
-    @staticmethod
-    def _darken(hex_color):
-        r, g, b = int(hex_color[1:3], 16), int(hex_color[3:5], 16), int(hex_color[5:7], 16)
-        r, g, b = max(0, r - 30), max(0, g - 30), max(0, b - 30)
-        return f"#{r:02x}{g:02x}{b:02x}"
+                    self._post(f"❌ Not found: {path}")
+            if all_recs:
+                df = pd.DataFrame(all_recs)
+                base = ["CLIENT NUMBER", "CLIENT NAME", "CASE #", "CASE NAME",
+                        "TM NO", "CLASS", "FILES", "EXT", "DATE ADDED"]
+                df = df[[c for c in base if c in df.columns]]
+                xlsx = os.path.join(EXPORT_DIR, "drive_data_export.xlsx")
+                csv  = os.path.join(EXPORT_DIR, "drive_data_export.csv")
+                df.to_excel(xlsx, index=False, engine="openpyxl")
+                df.to_csv(csv, index=False)
+                self._post(f"✅ Quick export done — {len(all_recs)} records")
+                self._post(f"   📊 {xlsx}")
+        self._run_thread(job)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
