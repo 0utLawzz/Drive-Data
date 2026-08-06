@@ -211,7 +211,7 @@ def check_file_patterns(file_names: str) -> dict:
     def _hit(pats):
         return any(re.search(p, all_text, re.IGNORECASE) for p in pats)
 
-    results = {cat: ("✓" if _hit(pats) else "") for cat, pats in patterns.items()}
+    results = {cat: (True if _hit(pats) else False) for cat, pats in patterns.items()}
 
     # Special logic: DATA SHEET + company keyword → COMPANY (clear NTN if only from data sheet)
     has_ds = bool(re.search(r"DATA\s*SHEET", all_text, re.IGNORECASE))
@@ -219,9 +219,9 @@ def check_file_patterns(file_names: str) -> dict:
     pure_ntn_pats = [r"\bNTN\b", r"\bCNIC\b", r"\bNIC\b", r"\bPASSPORT\b", r"\bID\s*[BF]?\b"]
 
     if has_ds and has_co_kw:
-        results["COMPANY"] = "✓"
+        results["COMPANY"] = True
         if not any(re.search(p, all_text, re.IGNORECASE) for p in pure_ntn_pats):
-            results["NTN"] = ""   # data sheet was the only NTN trigger → goes to COMPANY
+            results["NTN"] = False
 
     return results
 
@@ -463,6 +463,7 @@ class DriveDataApp(ctk.CTk):
 
         # State
         self._running      = False
+        self._editing_rule = None
         self.clients_path  = ctk.StringVar(value=DEFAULT_CLIENTS_PATH)
         self.conslt_path   = ctk.StringVar(value=DEFAULT_CONSULTANTS_PATH)
         self.custom_path   = ctk.StringVar(value="")
@@ -737,8 +738,8 @@ class DriveDataApp(ctk.CTk):
         _nb_entry(right, var=self._r_tgt, ph="e.g. OPPO  (blank = create new)",
                   width=240, row=6, column=0, sticky="ew", padx=12, pady=2)
 
-        _nb_btn(right, "➕  SAVE RULE", self._save_rule, fg=C["teal"],
-                row=7, column=0, sticky="ew", padx=12, pady=(14, 4))
+        self.btn_save = _nb_btn(right, "➕  SAVE RULE", self._save_rule, fg=C["teal"],
+                                row=7, column=0, sticky="ew", padx=12, pady=(14, 4))
         _nb_btn(right, "🔄  RELOAD LIST", self._reload_rules, fg=C["black"],
                 row=8, column=0, sticky="ew", padx=12, pady=4)
 
@@ -792,13 +793,32 @@ class DriveDataApp(ctk.CTk):
         ).grid(row=1, column=0, sticky="w", padx=10, pady=(0, 4))
 
         if is_custom and rule_data:
+            # Edit button (pencil)
+            ctk.CTkButton(
+                f, text="✎", width=28, height=28,
+                fg_color=C["teal"], hover_color=C["teal_lt"],
+                corner_radius=0, font=ctk.CTkFont(size=12),
+                text_color=C["white"],
+                command=lambda rd=rule_data: self._edit_rule(rd),
+            ).grid(row=0, column=1, rowspan=2, padx=(4, 2), pady=4)
+
+            # Delete button (cross)
             ctk.CTkButton(
                 f, text="✕", width=28, height=28,
                 fg_color=C["accent"], hover_color="#8B0000",
                 corner_radius=0, font=ctk.CTkFont(size=12),
                 text_color=C["white"],
                 command=lambda rd=rule_data: self._delete_rule(rd),
-            ).grid(row=0, column=1, rowspan=2, padx=8, pady=4)
+            ).grid(row=0, column=2, rowspan=2, padx=(2, 8), pady=4)
+
+    def _edit_rule(self, rule_data):
+        self._editing_rule = rule_data
+        self._r_name.set(rule_data.get("name", ""))
+        self._r_tgt.set(rule_data.get("target", ""))
+        self._r_pats.delete("1.0", "end")
+        self._r_pats.insert("1.0", "\n".join(rule_data.get("patterns", [])))
+        self.btn_save.configure(text="💾  UPDATE RULE")
+        self._log(f"📝  Editing rule '{rule_data.get('name')}'")
 
     def _save_rule(self):
         name = self._r_name.get().strip().upper()
@@ -812,16 +832,34 @@ class DriveDataApp(ctk.CTk):
 
         pats  = [p.strip() for p in raw.splitlines() if p.strip()]
         rules = load_custom_rules()
-        rules.append({"name": tgt, "patterns": pats, "target": tgt})
-        save_custom_rules(rules)
 
+        if self._editing_rule is not None:
+            # Update existing rule
+            for idx, r in enumerate(rules):
+                if r == self._editing_rule:
+                    rules[idx] = {"name": name, "patterns": pats, "target": tgt}
+                    break
+            self._editing_rule = None
+            self.btn_save.configure(text="➕  SAVE RULE")
+            self._log(f"✅ Custom rule '{name}' updated ({len(pats)} pattern(s)) → column '{tgt}'")
+        else:
+            # Create new rule
+            rules.append({"name": name, "patterns": pats, "target": tgt})
+            self._log(f"✅ Custom rule '{name}' saved ({len(pats)} pattern(s)) → column '{tgt}'")
+
+        save_custom_rules(rules)
         self._r_name.set("")
         self._r_pats.delete("1.0", "end")
         self._r_tgt.set("")
         self._refresh_rules_list()
-        self._log(f"✅ Custom rule '{name}' saved ({len(pats)} pattern(s)) → column '{tgt}'")
 
     def _delete_rule(self, rule_data):
+        if self._editing_rule == rule_data:
+            self._editing_rule = None
+            self.btn_save.configure(text="➕  SAVE RULE")
+            self._r_name.set("")
+            self._r_pats.delete("1.0", "end")
+            self._r_tgt.set("")
         rules = [r for r in load_custom_rules() if r != rule_data]
         save_custom_rules(rules)
         self._refresh_rules_list()
