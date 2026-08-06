@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🗂️ Drive Data — Pattern Matcher Showcase</title>
+  <!-- Bebas Neue & Space Grotesk fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Grotesk:wght@400;500;700&family=DM+Mono:wght@500&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --bg: #F0E8D0;
+      --bg-alt: #E8DFC7;
+      --panel: #FAF6EE;
+      --black: #0C0C0C;
+      --accent: #C94A00;
+      --teal: #0A6B52;
+      --teal-lt: #0D9970;
+      --yellow: #D4A800;
+      --border: 3px solid #0C0C0C;
+      --border-thin: 2px solid #0C0C0C;
+      --shadow: 5px 5px 0 #0C0C0C;
+      --shadow-lg: 8px 8px 0 #0C0C0C;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--black);
+      font-family: 'Space Grotesk', sans-serif;
+      line-height: 1.5;
+      padding-bottom: 60px;
+    }
+
+    header {
+      background-color: var(--black);
+      color: var(--panel);
+      padding: 15px 40px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 4px solid var(--black);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .logo {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 28px;
+      letter-spacing: 2px;
+    }
+
+    .logo span.dot {
+      color: var(--accent);
+    }
+
+    .logo span.sub {
+      color: var(--teal-lt);
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 40px auto;
+      padding: 0 20px;
+    }
+
+    h1, h2, h3, .heading-font {
+      font-family: 'Bebas Neue', sans-serif;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      font-size: 64px;
+      margin-bottom: 10px;
+      line-height: 0.9;
+    }
+
+    h2 {
+      font-size: 38px;
+      margin-bottom: 20px;
+      border-bottom: var(--border-thin);
+      padding-bottom: 5px;
+      display: inline-block;
+    }
+
+    .hero {
+      background-color: var(--bg-alt);
+      border: var(--border);
+      box-shadow: var(--shadow-lg);
+      padding: 40px;
+      margin-bottom: 40px;
+      position: relative;
+    }
+
+    .hero-stamp {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      font-family: 'Bebas Neue', sans-serif;
+      background-color: var(--yellow);
+      border: var(--border);
+      padding: 5px 15px;
+      font-size: 20px;
+      transform: rotate(5deg);
+      box-shadow: 3px 3px 0 var(--black);
+    }
+
+    .badge {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      font-weight: bold;
+      border: var(--border-thin);
+      padding: 3px 10px;
+      text-transform: uppercase;
+      display: inline-block;
+      margin-right: 8px;
+      margin-bottom: 8px;
+      background-color: rgba(12, 12, 12, 0.08);
+    }
+
+    .badge.accent {
+      background-color: var(--accent);
+      color: var(--panel);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 30px;
+      margin-bottom: 40px;
+    }
+
+    .card {
+      background-color: var(--panel);
+      border: var(--border);
+      box-shadow: var(--shadow);
+      padding: 30px;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+
+    .card:hover {
+      transform: translate(-3px, -3px);
+      box-shadow: 8px 8px 0 var(--black);
+    }
+
+    .card.accent {
+      border-color: var(--accent);
+      box-shadow: 5px 5px 0 var(--accent);
+    }
+
+    .card.accent:hover {
+      box-shadow: 8px 8px 0 var(--accent);
+    }
+
+    .card-title {
+      font-size: 24px;
+      margin-bottom: 12px;
+      color: var(--accent);
+    }
+
+    .card ul {
+      list-style: none;
+      margin-top: 10px;
+    }
+
+    .card li {
+      margin-bottom: 8px;
+      padding-left: 20px;
+      position: relative;
+    }
+
+    .card li::before {
+      content: "➔";
+      position: absolute;
+      left: 0;
+      color: var(--teal-lt);
+    }
+
+    .button {
+      background-color: var(--accent);
+      color: var(--panel);
+      border: var(--border-thin);
+      padding: 10px 25px;
+      font-family: 'DM Mono', monospace;
+      font-size: 14px;
+      font-weight: bold;
+      text-transform: uppercase;
+      text-decoration: none;
+      display: inline-block;
+      box-shadow: 4px 4px 0 var(--black);
+      cursor: pointer;
+      transition: transform 0.1s, box-shadow 0.1s;
+    }
+
+    .button:hover {
+      transform: translate(-2px, -2px);
+      box-shadow: 6px 6px 0 var(--black);
+      background-color: var(--teal-lt);
+    }
+
+    .button:active {
+      transform: translate(2px, 2px);
+      box-shadow: 0 0 0 var(--black);
+    }
+
+    pre {
+      background-color: var(--black);
+      color: var(--teal-lt);
+      padding: 15px;
+      border: var(--border-thin);
+      font-family: 'DM Mono', monospace;
+      font-size: 13px;
+      overflow-x: auto;
+      margin: 15px 0;
+    }
+
+    footer {
+      text-align: center;
+      margin-top: 60px;
+      font-size: 14px;
+      color: var(--black);
+    }
+
+    footer a {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: bold;
+    }
+
+    footer a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="logo">DRIVE DATA<span class="dot">.</span><span class="sub">V2</span></div>
+    <div>
+      <a href="https://github.com/0utLawzz/Drive-Data" class="button" style="padding: 6px 15px; font-size: 12px; background: var(--teal)">GitHub Repo</a>
+    </div>
+  </header>
+
+  <div class="container">
+    
+    <!-- Hero Section -->
+    <div class="hero">
+      <div class="hero-stamp">NEO-BRUTALISM</div>
+      <h1>DRIVE FOLDERS PATTERN MATCHER</h1>
+      <p style="font-size: 18px; margin: 15px 0 25px 0; font-weight: 500;">
+        A high-performance directory auditing desktop app designed for trademark legal teams. Scans cloud-mirrored structures locally, processes regex-matching rules dynamically, and updates Google Sheets with boolean statuses.
+      </p>
+      <div>
+        <span class="badge accent">20 Active Rules</span>
+        <span class="badge">Google Sheets Sync</span>
+        <span class="badge">Local Excel/CSV Export</span>
+        <span class="badge">Incremental Renames</span>
+      </div>
+    </div>
+
+    <h2>🚀 Core Capabilities</h2>
+    <div class="grid">
+      
+      <!-- Card 1 -->
+      <div class="card">
+        <h3 class="card-title">🔍 Scanning Engines</h3>
+        <p>Choose the optimal scan strategy depending on the folder complexity:</p>
+        <ul>
+          <li><strong>Deep Scan (Thorough):</strong> Traverses all folder levels recursively using <code>os.walk</code> to capture loose files.</li>
+          <li><strong>Fast Scan (Strict):</strong> Audits exact 2-level depths (Clients ➔ Cases) for lightning-fast speeds over networks.</li>
+        </ul>
+      </div>
+
+      <!-- Card 2 -->
+      <div class="card">
+        <h3 class="card-title">⚙️ Dynamic Rules Manager</h3>
+        <p>Edit case triggers and column outputs instantly in the GUI without touching Python code:</p>
+        <ul>
+          <li>Seeded with 14 default trademark categories (TM-1, TM-48, OPPO, NTN).</li>
+          <li>Add custom matching patterns using regex strings.</li>
+          <li>Redirect rules to merge into existing columns or output to new ones.</li>
+        </ul>
+      </div>
+
+      <!-- Card 3 -->
+      <div class="card">
+        <h3 class="card-title">📊 Smart Integrations</h3>
+        <p>Fully formatted and protected outputs:</p>
+        <ul>
+          <li><strong>Google Sheets Sync:</strong> Automatic columns check and sync + frozen headers, bold text, and column width autofitting.</li>
+          <li><strong>File Overwrite Protection:</strong> Local exports auto-increment file names (e.g. <code>all_patterns_1.xlsx</code>) instead of replacing.</li>
+        </ul>
+      </div>
+
+    </div>
+
+    <h2>💻 Setup & Run</h2>
+    <div class="card" style="margin-bottom: 40px;">
+      <h3 style="font-size: 24px; margin-bottom: 15px;">Installation</h3>
+      <p>1. Clone the repository and install dependencies:</p>
+      <pre>git clone https://github.com/0utLawzz/Drive-Data.git
+cd Drive-Data
+pip install -r requirements.txt</pre>
+      <p>2. Download Google Cloud service account keys to <code>credentials.json</code> inside the root directory.</p>
+      <p>3. Run the application via the desktop launcher or terminal:</p>
+      <pre># Windows Launcher
+run.bat
+
+# Python Command
+python main.py</pre>
+    </div>
+
+    <h2>📬 Get In Touch</h2>
+    <div class="grid">
+      <div class="card accent">
+        <h3 class="card-title" style="color: var(--black)">BrandEx Trademark Services</h3>
+        <p style="margin-bottom: 15px;">Need custom directory automation or Google API integrations? Let's connect.</p>
+        <p><strong>Email:</strong> net2outlawzz@gmail.com | net2tara@gmail.com</p>
+        <p><strong>Website:</strong> <a href="https://www.brandex.pk" style="color: var(--accent); font-weight: bold; text-decoration: none;">www.brandex.pk</a></p>
+      </div>
+    </div>
+
+    <footer>
+      <p>Made with ❤️ by <a href="https://github.com/0utLawzz">OutLawZ™</a></p>
+    </footer>
+
+  </div>
+
+</body>
+</html>

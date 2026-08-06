@@ -356,10 +356,81 @@ def upload_to_sheets(records, log_fn=print):
         hdrs = [f"{_HEADER_EMOJI.get(c, '🔹')} {c}" for c in cols]
         try:
             ws = sh.worksheet(SHEET_NAME)
+            # Sync headers if they mismatch
+            existing_hdrs = ws.row_values(1)
+            if existing_hdrs != hdrs:
+                log_fn("🔄 Sheet headers mismatch. Synchronizing headers...")
+                if ws.col_count < len(hdrs):
+                    ws.add_cols(len(hdrs) - ws.col_count)
+                end_col = chr(64 + len(hdrs)) if len(hdrs) <= 26 else "A" + chr(64 + len(hdrs) - 26)
+                ws.update(values=[hdrs], range_name=f"A1:{end_col}1")
         except gspread.exceptions.WorksheetNotFound:
             ws = sh.add_worksheet(SHEET_NAME, rows=2000, cols=len(hdrs))
-        end_col = chr(64 + len(hdrs)) if len(hdrs) <= 26 else "A" + chr(64 + len(hdrs) - 26)
-        ws.update(values=[hdrs], range_name=f"A1:{end_col}1")
+            end_col = chr(64 + len(hdrs)) if len(hdrs) <= 26 else "A" + chr(64 + len(hdrs) - 26)
+            ws.update(values=[hdrs], range_name=f"A1:{end_col}1")
+
+        # Formatting: Bold headers, freeze first row, auto-resize columns
+        try:
+            sh.batch_update({
+                "requests": [
+                    {
+                        "updateSheetProperties": {
+                            "properties": {
+                                "sheetId": ws.id,
+                                "gridProperties": {
+                                    "frozenRowCount": 1
+                                }
+                            },
+                            "fields": "gridProperties.frozenRowCount"
+                        }
+                    },
+                    {
+                        "repeatCell": {
+                            "range": {
+                                "sheetId": ws.id,
+                                "startRowIndex": 0,
+                                "endRowIndex": 1,
+                                "startColumnIndex": 0,
+                                "endColumnIndex": len(hdrs)
+                            },
+                            "cell": {
+                                "userEnteredFormat": {
+                                    "backgroundColor": {
+                                        "red": 0.98,
+                                        "green": 0.96,
+                                        "blue": 0.93
+                                    },
+                                    "textFormat": {
+                                        "bold": True,
+                                        "fontSize": 10,
+                                        "fontFamily": "Arial"
+                                    },
+                                    "borders": {
+                                        "bottom": {
+                                            "style": "SOLID_MEDIUM",
+                                            "color": {"red": 0.12, "green": 0.12, "blue": 0.12}
+                                        }
+                                    }
+                                }
+                            },
+                            "fields": "userEnteredFormat(backgroundColor,textFormat,borders)"
+                        }
+                    },
+                    {
+                        "autoResizeDimensions": {
+                            "dimensions": {
+                                "sheetId": ws.id,
+                                "dimension": "COLUMNS",
+                                "startIndex": 0,
+                                "endIndex": len(hdrs)
+                            }
+                        }
+                    }
+                ]
+            })
+        except Exception as fmt_err:
+            log_fn(f"⚠️ Formatting warning: {fmt_err}")
+
         data = [[r.get(c, "") for c in cols] for r in records]
         ws.append_rows(data)
         log_fn(f"✅ Uploaded {len(records)} records to Google Sheets")
@@ -381,6 +452,18 @@ _SHORT = {
 }
 
 
+def get_unique_filepath(base_dir, name, ext):
+    path = os.path.join(base_dir, f"{name}.{ext}")
+    if not os.path.exists(path):
+        return path
+    idx = 1
+    while True:
+        path = os.path.join(base_dir, f"{name}_{idx}.{ext}")
+        if not os.path.exists(path):
+            return path
+        idx += 1
+
+
 def export_local(records, prefix, log_fn=print):
     if not records:
         log_fn("No records!")
@@ -389,8 +472,8 @@ def export_local(records, prefix, log_fn=print):
     cols = [c for c in get_all_columns() if c in df.columns]
     df   = df[cols]
     short = _SHORT.get(prefix, prefix)
-    xlsx  = os.path.join(EXPORT_DIR, f"{short}.xlsx")
-    csv   = os.path.join(EXPORT_DIR, f"{short}.csv")
+    xlsx  = get_unique_filepath(EXPORT_DIR, short, "xlsx")
+    csv   = get_unique_filepath(EXPORT_DIR, short, "csv")
     df.to_excel(xlsx, index=False, engine="openpyxl")
     df.to_csv(csv, index=False)
     log_fn(f"💾 Exported {len(df)} records")
@@ -469,6 +552,10 @@ class DriveDataApp(ctk.CTk):
         self.minsize(860, 700)
         self.configure(fg_color=C["bg"])
 
+        # Check Google Connection
+        client, err = get_gs_client()
+        self.google_connected = (err is None)
+
         # State
         self._running      = False
         self._editing_rule = None
@@ -502,13 +589,25 @@ class DriveDataApp(ctk.CTk):
             text_color=C["panel"],
         ).grid(row=0, column=0, sticky="w", padx=20, pady=0)
 
-        badge_frame = ctk.CTkFrame(hdr, fg_color=C["accent"], corner_radius=0)
-        badge_frame.grid(row=0, column=1, padx=(0, 16))
+        # Google status indicator
+        g_color = C["teal"] if self.google_connected else C["accent"]
+        g_lbl = "CONNECTED" if self.google_connected else "DISCONNECTED"
+        g_frame = ctk.CTkFrame(hdr, fg_color=g_color, corner_radius=0)
+        g_frame.grid(row=0, column=1, padx=(0, 8))
+        ctk.CTkLabel(
+            g_frame,
+            text=f"  GOOGLE: {g_lbl}  ",
+            font=ctk.CTkFont(family="Arial Black", size=10, weight="bold"),
+            text_color=C["white"],
+        ).pack(padx=2, pady=6)
+
+        badge_frame = ctk.CTkFrame(hdr, fg_color=C["black"], border_color=C["panel"], border_width=1, corner_radius=0)
+        badge_frame.grid(row=0, column=2, padx=(0, 16))
         ctk.CTkLabel(
             badge_frame,
             text=f"  v2.0 · {len(get_active_patterns())} RULES  ",
-            font=ctk.CTkFont(family="Arial", size=10, weight="bold"),
-            text_color=C["white"],
+            font=ctk.CTkFont(family="Arial Black", size=10, weight="bold"),
+            text_color=C["panel"],
         ).pack(padx=2, pady=6)
 
         # ── Tab bar ────────────────────────────────────────────────────────
@@ -951,12 +1050,49 @@ class DriveDataApp(ctk.CTk):
             return False
         return True
 
-    def _wrap(self, fn):
+    def _show_popup(self, title, message):
+        # Create popup window styled as Neo-Brutalist
+        popup = ctk.CTkToplevel(self)
+        popup.title(title)
+        popup.geometry("380x200")
+        popup.configure(fg_color=C["bg"])
+        popup.transient(self)
+        popup.grab_set()
+
+        popup.update_idletasks()
+        w = popup.winfo_width()
+        h = popup.winfo_height()
+        extra_x = (self.winfo_width() - w) // 2
+        extra_y = (self.winfo_height() - h) // 2
+        popup.geometry(f"+{self.winfo_x() + extra_x}+{self.winfo_y() + extra_y}")
+
+        # Neo-Brutalist card layout
+        card = _shadow_card(popup, shadow=5, row=0, column=0, sticky="nsew", padx=15, pady=15)
+        card.grid_columnconfigure(0, weight=1)
+        card.grid_rowconfigure(1, weight=1)
+        popup.grid_columnconfigure(0, weight=1)
+        popup.grid_rowconfigure(0, weight=1)
+
+        _nb_label(card, title.upper(), size=14, weight="bold", color=C["accent"], row=0, column=0, pady=(10, 5))
+
+        lbl_msg = ctk.CTkLabel(
+            card, text=message,
+            font=ctk.CTkFont(family="Arial", size=12, weight="bold"),
+            text_color=C["black"], justify="center", wraplength=300
+        )
+        lbl_msg.grid(row=1, column=0, pady=5, sticky="nsew")
+
+        _nb_btn(card, "OK", popup.destroy, fg=C["black"], tc=C["white"], row=2, column=0, pady=(10, 10), padx=40, sticky="ew")
+
+    def _wrap(self, fn, job_name="Scan Job"):
         def wrapper():
             try:
-                fn()
+                records_count = fn()
+                if records_count is not None:
+                    self.after(0, lambda: self._show_popup("JOB DONE", f"{job_name} finished successfully!\nProcessed {records_count} records."))
             except Exception as exc:
                 self.after(0, lambda: self._log(f"❌ Error: {exc}"))
+                self.after(0, lambda: self._show_popup("ERROR", f"An error occurred:\n{exc}"))
             finally:
                 self._running = False
                 self.after(0, self._stop_prog)
@@ -965,10 +1101,10 @@ class DriveDataApp(ctk.CTk):
     def _post(self, msg):
         self.after(0, lambda m=msg: self._log(m))
 
-    def _run_thread(self, fn):
+    def _run_thread(self, fn, job_name="Scan Job"):
         self._running = True
         self._start_prog()
-        threading.Thread(target=self._wrap(fn), daemon=True).start()
+        threading.Thread(target=self._wrap(fn, job_name), daemon=True).start()
 
     def _flags(self):
         return self.loc_var.get(), self.sht_var.get()
@@ -979,23 +1115,25 @@ class DriveDataApp(ctk.CTk):
         if not self._guard(): return
         def job():
             p = self.clients_path.get()
-            if not os.path.exists(p): self._post(f"❌ Not found: {p}"); return
+            if not os.path.exists(p): self._post(f"❌ Not found: {p}"); return 0
             self._post("📁 Scanning ALL CLIENTS …")
             recs = process_directory(p, "", self._get_max(), self.deep_scan_var.get())
             self._post(f"   ✔ {len(recs)} record groups found")
             handle_upload(recs, "clients_data", *self._flags(), self._post)
-        self._run_thread(job)
+            return len(recs)
+        self._run_thread(job, "All Clients Scan")
 
     def _run_conslt(self):
         if not self._guard(): return
         def job():
             p = self.conslt_path.get()
-            if not os.path.exists(p): self._post(f"❌ Not found: {p}"); return
+            if not os.path.exists(p): self._post(f"❌ Not found: {p}"); return 0
             self._post("🤝 Scanning CONSULTANTS …")
             recs = process_directory(p, "", self._get_max(), self.deep_scan_var.get())
             self._post(f"   ✔ {len(recs)} record groups found")
             handle_upload(recs, "consultants_data", *self._flags(), self._post)
-        self._run_thread(job)
+            return len(recs)
+        self._run_thread(job, "Consultants Scan")
 
     def _run_both(self):
         if not self._guard(): return
@@ -1011,19 +1149,21 @@ class DriveDataApp(ctk.CTk):
                 else:
                     self._post(f"❌ Not found: {path}")
             handle_upload(all_recs, "all_data", *self._flags(), self._post)
-        self._run_thread(job)
+            return len(all_recs)
+        self._run_thread(job, "Scan Both Directories")
 
     def _run_custom(self):
         if not self._guard(): return
         def job():
             p = self.custom_path.get().strip()
-            if not p:              self._post("❌ Custom path is empty."); return
-            if not os.path.exists(p): self._post(f"❌ Not found: {p}"); return
+            if not p:              self._post("❌ Custom path is empty."); return 0
+            if not os.path.exists(p): self._post(f"❌ Not found: {p}"); return 0
             self._post(f"📂 Scanning: {p}")
             recs = process_directory(p, "", self._get_max(), self.deep_scan_var.get())
             self._post(f"   ✔ {len(recs)} record groups found")
             handle_upload(recs, "custom_data", *self._flags(), self._post)
-        self._run_thread(job)
+            return len(recs)
+        self._run_thread(job, "Custom Path Scan")
 
     def _run_quick(self):
         if not self._guard(): return
@@ -1043,13 +1183,14 @@ class DriveDataApp(ctk.CTk):
                 base = ["CLIENT NUMBER", "CLIENT NAME", "CASE #", "CASE NAME",
                         "TM NO", "CLASS", "FILES", "EXT", "DATE ADDED"]
                 df = df[[c for c in base if c in df.columns]]
-                xlsx = os.path.join(EXPORT_DIR, "drive_data_export.xlsx")
-                csv  = os.path.join(EXPORT_DIR, "drive_data_export.csv")
+                xlsx = get_unique_filepath(EXPORT_DIR, "drive_data_export", "xlsx")
+                csv  = get_unique_filepath(EXPORT_DIR, "drive_data_export", "csv")
                 df.to_excel(xlsx, index=False, engine="openpyxl")
                 df.to_csv(csv, index=False)
                 self._post(f"✅ Quick export done — {len(all_recs)} records")
                 self._post(f"   📊 {xlsx}")
-        self._run_thread(job)
+            return len(all_recs)
+        self._run_thread(job, "Quick Export Scan")
 
 
 # ══════════════════════════════════════════════════════════════════════════════

@@ -377,57 +377,27 @@ production (OI-7 is unaffected and still open).
 1. ~~[OI-1] Fix the 2-digit Case Number regex in `main.py`.~~ **Superseded:**
    fixed in Parser V2 (`parser_v2/tokenizer.py`) instead of `main.py` directly —
    see decision 2026-07-09-E. Promoting the fix into `main.py` itself is now OI-7.
-2. ~~[OI-6] Run `validate_drive.py` against `2 CONSULTANTS` folder.~~ **Done** —
+   fixed in Parser V2 (`parser_v2/tokenizer.py`) instead of `main.py` directly —
    covered by `validate_parser_v2.py` in Sprint 3 (both roots, 3,454 case folders).
-3. **[OI-4] Investigate duplicate records (26 found).** Still open — carried to Sprint 4.
-4. Progress doc updated throughout Sprint 3 (this document).
+
+6. **Do not start OI-3 (Submission Integration)** until explicitly requested.
 
 ---
 
-## Completed Sprint — Sprint 4 Tasks (archived)
+## Completed Sprint — Sprint 5 Tasks (archived)
 
-1. **Online Drive scanner (`drive_api/`)** — done. Service Account auth,
-   `settings.json`-driven folder IDs, no local mount required. See milestone
-   above and decision 2026-07-09-H.
-2. **Full client/case/file metadata extraction (`inventory.py`)** — done.
-3. **CSV + XLSX + Markdown report export** — done
-   (`export/{clients,cases,files}.csv`, `export/drive_inventory.xlsx`,
-   `export/inventory_report.md`).
-4. **Documentation updates** — this file, `PROJECT_BIBLE.md`, `CHANGELOG.md`.
+1. **Desktop App GUI Refactoring** — Completed. Implemented a fully responsive **Neo-Brutalist (BrandEx)** themed CustomTkinter window with custom popups, status indicators, and background threading.
+2. **Rules Customization Manager** — Completed. Seeding `custom_rules.json` on startup with all 14 base rules. Implemented custom rule addition, edit (loading back into inputs), and delete persistence.
+3. **Robust Sheets Integration** — Completed. Sheets headers are validated and updated on the fly to support dynamic custom rules. Auto-sized column widths, bold headers, and frozen row 1 formatted automatically via Sheets batch updates.
+4. **Export Integrity & Protection** — Completed. Updated local files (Excel/CSV) to dynamically rename with numbered suffix (e.g. `_1.xlsx`) instead of overwriting. Export output values converted to clean standard booleans (`True`/`False`) instead of tickmarks.
+5. **Git Tree Cleanup** — Completed. Removed `sample_drive/` and committed pending workspace changes.
+6. **Showcase Landing Page** — Completed. Created a gorgeous responsive HTML showcase page at `docs/index.html` presenting the utility of the tool.
 
-## Next Sprint — Sprint 5 Tasks
+---
 
-> Replace this section at the start of each sprint. Archive the previous list as a
-> completed sprint block above.
->
-> **Explicitly out of scope until directed otherwise: OI-3 Submission Integration.**
+## Suggestions for Future Improvements (Next Steps)
 
-1. **Run `inventory.py` against the live Brandex Drive** and review
-   `export/inventory_report.md` once real `clients_folder_id`/
-   `consultants_folder_id` and `credentials.json` are provided — this
-   sprint only validated the pipeline against `sample_drive/`.
-
-2. **[OI-4] Investigate duplicate records (26 found in the first live-Drive run).**
-   - Re-run `validate_drive.py` (full traversal, needed for file-based duplicate
-     detection) or extend `validate_parser_v2.py` with duplicate-key tracking.
-   - Determine whether duplicates are folder-naming errors or genuine data issues.
-   - Document findings under a new Decisions Log entry.
-
-3. **[OI-7] Decide whether/when to promote Parser V2 into production.**
-   - Options: (a) swap `main.py` internals to import from `parser_v2`, (b) keep
-     `main.py` frozen and make `parser_v2` the new entry point with its own CLI.
-   - Requires stakeholder sign-off given `main.py` is actively used by the firm.
-   - If promoted: re-run `validate_parser_v2.py`-style comparison as a post-cutover
-     regression check, and bump the version.
-
-4. **[OI-8] Resolve the multi-TM-number folder convention (2 known cases).**
-   - Decide the business rule for folders with two 6-digit numbers (e.g. dispute
-     records) — first-found, last-found, or flag for manual entry.
-   - Encode the decision explicitly in `parser_v2/rules.py` once agreed, and add
-     it to the Confirmed Business Rules table as BR-8.
-
-5. **[OI-2] TM recovery from filenames** (if the folder name lacks a TM No,
-   attempt to extract it from documents inside the folder) — still pending,
-   unchanged from Sprint 1/2 backlog.
-
-6. **Do not start OI-3 (Submission Integration)** until explicitly requested.
+1. **Scan Cache for Cloud Mounts**: Add a temporary cache of scanned directory trees to prevent high network latency on subsequent Deep scans of Google Drive mounts.
+2. **Interactive Sheets Column Mapping**: Let users visually drag and drop case folder metadata segments to customize how sheet columns map to folders.
+3. **Regex Validator for Custom Rules**: Validate regex patterns in the GUI before saving to prevent runtime scanning failures.
+4. **Duplicate Record Reporting**: Highlight cases matching duplicate criteria directly in the GUI Status Log panel rather than just exporting duplicates.

@@ -1,0 +1,151 @@
+[
+  {
+    "name": "TM-1",
+    "patterns": [
+      "\\bTM-1\\b",
+      "\\bTM1\\b",
+      "\\(TM-1\\)",
+      "\\[TM-1\\]"
+    ],
+    "target": "TM-1"
+  },
+  {
+    "name": "TM-48",
+    "patterns": [
+      "\\bTM-48\\b",
+      "\\bTM48\\b",
+      "\\(TM-48\\)",
+      "\\[TM-48\\]",
+      "UPDATED\\s*\\[TM-48\\]",
+      "TM-48\\s*-\\s*COPY"
+    ],
+    "target": "TM-48"
+  },
+  {
+    "name": "EXAM",
+    "patterns": [
+      "\\bEXAMINATION\\b",
+      "\\bSHOWCASE\\b",
+      "SHOWCASE\\s*NOTICE",
+      "17\\(2\\)\\(B\\)",
+      "14\\(3\\)\\(A\\)",
+      "14\\(1\\)\\(b\\)",
+      "\\bREPLY\\b",
+      "REPLY\\s*OF\\s*NOTICE",
+      "MULTIPAL\\s*REPLIES"
+    ],
+    "target": "EXAM"
+  },
+  {
+    "name": "ACK",
+    "patterns": [
+      "\\bACK\\b",
+      "ACKNOWLEDGMENT",
+      "ACKNOLDGEMENT"
+    ],
+    "target": "ACK"
+  },
+  {
+    "name": "ACCEPTANCE",
+    "patterns": [
+      "\\bACCEPTANCE\\b",
+      "ACCEPTANCE\\s*DONE",
+      "COMPLETE\\s*FILE"
+    ],
+    "target": "ACCEPTANCE"
+  },
+  {
+    "name": "D-NOTE",
+    "patterns": [
+      "\\bTM-11\\b",
+      "\\bTM11\\b",
+      "IPO-PAKISTAN\\s*__\\s*TM\\s*11",
+      "TM\\s*11",
+      "DEMAND\\s*NOTE"
+    ],
+    "target": "D-NOTE"
+  },
+  {
+    "name": "TM-16",
+    "patterns": [
+      "\\bTM-16\\b",
+      "\\bTM16\\b",
+      "TM\\s*16"
+    ],
+    "target": "TM-16"
+  },
+  {
+    "name": "TM-50",
+    "patterns": [
+      "\\bTM-50\\b",
+      "\\bTM50\\b",
+      "TM\\s*50"
+    ],
+    "target": "TM-50"
+  },
+  {
+    "name": "TM-06",
+    "patterns": [
+      "IPO-PAKISTAN\\s*__\\s*TM\\s*06",
+      "IPO-PAKISTAN\\s*__\\s*TM\\s*\\d{2}"
+    ],
+    "target": "TM-06"
+  },
+  {
+    "name": "COMPANY",
+    "patterns": [
+      "BOARD\\s*OF\\s*RESULOTION",
+      "BOARD\\s*OF\\s*RESOLUTION",
+      "\\bPVT\\s*LTD\\b",
+      "\\bPRIVATE\\s*LIMITED\\b",
+      "\\bSMC\\b",
+      "\\bLIMITED\\b"
+    ],
+    "target": "COMPANY"
+  },
+  {
+    "name": "NTN",
+    "patterns": [
+      "\\bNTN\\b",
+      "\\bCNIC\\b",
+      "\\bNIC\\b",
+      "\\bPASSPORT\\b",
+      "\\bID\\s*[BF]?\\b",
+      "DATA\\s*SHEET"
+    ],
+    "target": "NTN"
+  },
+  {
+    "name": "OPPO",
+    "patterns": [
+      "WITHDRAWN\\s*LETTER",
+      "\\bOPPOSITION\\b",
+      "GROUNDS\\s*OF\\s*OPPOSITION",
+      "\\bOPPO\\b",
+      "LEGAL\\s*NOTICE",
+      "LEGAL\\s*NOTIC\\b"
+    ],
+    "target": "OPPO"
+  },
+  {
+    "name": "PUB",
+    "patterns": [
+      "\\bPUBLICATION\\b",
+      "JOURNAL\\s*PUBLICATION",
+      "JOURNAL\\s*CONVERT",
+      "Journal_\\d+"
+    ],
+    "target": "PUB"
+  },
+  {
+    "name": "CERTIFICATE",
+    "patterns": [
+      "\\bCERTIFICATE\\b",
+      "CERTIFICATE\\s*WITH\\s*SIGN",
+      "ORIGINAL\\s*CERTIFICATE",
+      "TRADE\\s*MARK\\s*CERTIFICATE",
+      "RENEWAL\\s*CERTIFICATE"
+    ],
+    "target": "CERTIFICATE"
+  }
+]
