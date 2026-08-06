@@ -122,7 +122,7 @@ BASE_COLUMNS = [
     "FILES", "EXT",
     "TM-1", "TM-48", "EXAM", "ACK", "ACCEPTANCE", "D-NOTE",
     "TM-16", "TM-50", "TM-06", "COMPANY", "NTN", "OPPO", "PUB", "CERTIFICATE",
-    "DATE ADDED",
+    "DATE ADDED", "UPDATED ON",
 ]
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -312,10 +312,14 @@ def process_directory(base_path, _prefix, max_records=None, deep_scan=True):
             "CASE #":        no,   "CASE NAME":   nm,
             "TM NO":         tm,   "CLASS":        cls,
             "FILES":         fnames, "EXT":        fexts,
-            "DATE ADDED":    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "DATE ADDED":    datetime.now().strftime("%d-%b-%y"),
+            "UPDATED ON":    datetime.now().strftime("%d-%b-%y"),
         }
         rec.update(check_file_patterns(fnames))
         records.append(rec)
+    
+    # Sort records by CLIENT NUMBER, then CASE #
+    records.sort(key=lambda x: (x.get("CLIENT NUMBER", ""), x.get("CASE #", "")))
     return records
 
 
@@ -330,7 +334,7 @@ _HEADER_EMOJI = {
     "EXAM": "📝", "ACK": "✅", "ACCEPTANCE": "✅", "D-NOTE": "📋",
     "TM-16": "📄", "TM-50": "📄", "TM-06": "📄",
     "COMPANY": "🏢", "NTN": "🪪", "OPPO": "⚖️",
-    "PUB": "📰", "CERTIFICATE": "📜", "DATE ADDED": "📅",
+    "PUB": "📰", "CERTIFICATE": "📜", "DATE ADDED": "📅", "UPDATED ON": "🔄",
 }
 
 
@@ -369,8 +373,57 @@ def upload_to_sheets(records, log_fn=print):
             end_col = chr(64 + len(hdrs)) if len(hdrs) <= 26 else "A" + chr(64 + len(hdrs) - 26)
             ws.update(values=[hdrs], range_name=f"A1:{end_col}1")
 
-        # Formatting: Bold headers, freeze first row, auto-resize columns
+        # Fetch existing sheet content for TM NO lookup
+        all_rows = ws.get_all_values()
+        tm_to_row = {}
+        if len(all_rows) > 1:
+            for idx, r in enumerate(all_rows[1:], start=2):
+                if len(r) > 4:
+                    tm_val = r[4].strip()
+                    if tm_val:
+                        tm_to_row[tm_val] = (idx, r)
+
+        updates = []
+        appends = []
+
+        for r in records:
+            tm_no = r.get("TM NO", "").strip()
+            row_data = []
+            for c in cols:
+                if c == "DATE ADDED":
+                    # Preserve original date if row already exists
+                    if tm_no in tm_to_row:
+                        old_row = tm_to_row[tm_no][1]
+                        date_idx = cols.index("DATE ADDED")
+                        if date_idx < len(old_row):
+                            row_data.append(old_row[date_idx])
+                            continue
+                row_data.append(r.get(c, ""))
+
+            if tm_no and tm_no in tm_to_row:
+                row_idx = tm_to_row[tm_no][0]
+                col_letter = chr(64 + len(cols)) if len(cols) <= 26 else "A" + chr(64 + len(cols) - 26)
+                updates.append({
+                    'range': f'A{row_idx}:{col_letter}{row_idx}',
+                    'values': [row_data]
+                })
+            else:
+                appends.append(row_data)
+
+        # Apply updates
+        if updates:
+            ws.batch_update(updates)
+            log_fn(f"🔄 Updated {len(updates)} existing records (TM NO Lookup)")
+
+        # Apply appends
+        if appends:
+            ws.append_rows(appends)
+            log_fn(f"✅ Appended {len(appends)} new records to Google Sheets")
+
+        # Formatting: Ysabeau SC font, alternate row colors, frozen top row
         try:
+            total_rows = ws.row_count
+            end_col_idx = len(hdrs)
             sh.batch_update({
                 "requests": [
                     {
@@ -391,19 +444,19 @@ def upload_to_sheets(records, log_fn=print):
                                 "startRowIndex": 0,
                                 "endRowIndex": 1,
                                 "startColumnIndex": 0,
-                                "endColumnIndex": len(hdrs)
+                                "endColumnIndex": end_col_idx
                             },
                             "cell": {
                                 "userEnteredFormat": {
                                     "backgroundColor": {
-                                        "red": 0.98,
-                                        "green": 0.96,
-                                        "blue": 0.93
+                                        "red": 0.94,
+                                        "green": 0.91,
+                                        "blue": 0.85
                                     },
                                     "textFormat": {
                                         "bold": True,
                                         "fontSize": 10,
-                                        "fontFamily": "Arial"
+                                        "fontFamily": "Ysabeau SC"
                                     },
                                     "borders": {
                                         "bottom": {
@@ -416,13 +469,89 @@ def upload_to_sheets(records, log_fn=print):
                             "fields": "userEnteredFormat(backgroundColor,textFormat,borders)"
                         }
                     },
+                    # Default Ysabeau SC font format for data rows
+                    {
+                        "repeatCell": {
+                            "range": {
+                                "sheetId": ws.id,
+                                "startRowIndex": 1,
+                                "endRowIndex": total_rows,
+                                "startColumnIndex": 0,
+                                "endColumnIndex": end_col_idx
+                            },
+                            "cell": {
+                                "userEnteredFormat": {
+                                    "textFormat": {
+                                        "fontFamily": "Ysabeau SC",
+                                        "fontSize": 10
+                                    }
+                                }
+                            },
+                            "fields": "userEnteredFormat(textFormat)"
+                        }
+                    },
+                    # Banding/Alternating Colors using Conditional Formatting rules
+                    {
+                        "addConditionalFormatRule": {
+                            "rule": {
+                                "ranges": [{
+                                    "sheetId": ws.id,
+                                    "startRowIndex": 1,
+                                    "endRowIndex": total_rows,
+                                    "startColumnIndex": 0,
+                                    "endColumnIndex": end_col_idx
+                                }],
+                                "booleanRule": {
+                                    "condition": {
+                                        "type": "CUSTOM_FORMULA",
+                                        "values": [{"userEnteredValue": "=ISEVEN(ROW())"}]
+                                    },
+                                    "format": {
+                                        "backgroundColor": {
+                                            "red": 1.0,
+                                            "green": 1.0,
+                                            "blue": 1.0
+                                        }
+                                    }
+                                }
+                            },
+                            "index": 0
+                        }
+                    },
+                    {
+                        "addConditionalFormatRule": {
+                            "rule": {
+                                "ranges": [{
+                                    "sheetId": ws.id,
+                                    "startRowIndex": 1,
+                                    "endRowIndex": total_rows,
+                                    "startColumnIndex": 0,
+                                    "endColumnIndex": end_col_idx
+                                }],
+                                "booleanRule": {
+                                    "condition": {
+                                        "type": "CUSTOM_FORMULA",
+                                        "values": [{"userEnteredValue": "=ISODD(ROW())"}]
+                                    },
+                                    "format": {
+                                        "backgroundColor": {
+                                            "red": 0.98,
+                                            "green": 0.96,
+                                            "blue": 0.93
+                                        }
+                                    }
+                                }
+                            },
+                            "index": 1
+                        }
+                    },
                     {
                         "autoResizeDimensions": {
                             "dimensions": {
                                 "sheetId": ws.id,
                                 "dimension": "COLUMNS",
                                 "startIndex": 0,
-                                "endIndex": len(hdrs)
+                                "endIndex": end_col_idx
                             }
                         }
                     }
@@ -431,9 +560,6 @@ def upload_to_sheets(records, log_fn=print):
         except Exception as fmt_err:
             log_fn(f"⚠️ Formatting warning: {fmt_err}")
 
-        data = [[r.get(c, "") for c in cols] for r in records]
-        ws.append_rows(data)
-        log_fn(f"✅ Uploaded {len(records)} records to Google Sheets")
         return True
     except Exception as exc:
         log_fn(f"❌ Sheets error: {exc}")
@@ -824,6 +950,7 @@ class DriveDataApp(ctk.CTk):
 
         self._r_name = ctk.StringVar()
         self._r_tgt  = ctk.StringVar()
+        self._plain_text_mode = ctk.BooleanVar(value=False)
 
         _nb_label(right, "RULE / COLUMN NAME:", size=10, weight="normal",
                   row=1, column=0, sticky="w", padx=12, pady=(8, 0))
@@ -840,24 +967,34 @@ class DriveDataApp(ctk.CTk):
         )
         self._r_pats.grid(row=4, column=0, sticky="ew", padx=12, pady=2)
 
+        # Plain Text Mode checkbox
+        self.chk_plain = ctk.CTkCheckBox(
+            right, text="PLAIN TEXT MODE (NO REGEX)", variable=self._plain_text_mode,
+            font=ctk.CTkFont(family="Arial Black", size=10, weight="bold"),
+            fg_color=C["accent"], hover_color=C["teal"],
+            border_color=C["black"], text_color=C["black"],
+            checkmark_color=C["white"], corner_radius=0,
+        )
+        self.chk_plain.grid(row=5, column=0, sticky="w", padx=12, pady=4)
+
         _nb_label(right, "MERGE INTO EXISTING COLUMN (optional):", size=10, weight="normal",
-                  row=5, column=0, sticky="w", padx=12, pady=(8, 0))
+                  row=6, column=0, sticky="w", padx=12, pady=(4, 0))
         _nb_entry(right, var=self._r_tgt, ph="e.g. OPPO  (blank = create new)",
-                  width=240, row=6, column=0, sticky="ew", padx=12, pady=2)
+                  width=240, row=7, column=0, sticky="ew", padx=12, pady=2)
 
         self.btn_save = _nb_btn(right, "➕  SAVE RULE", self._save_rule, fg=C["teal"],
-                                row=7, column=0, sticky="ew", padx=12, pady=(14, 4))
+                                row=8, column=0, sticky="ew", padx=12, pady=(14, 4))
         _nb_btn(right, "🔄  RELOAD LIST", self._reload_rules, fg=C["black"],
-                row=8, column=0, sticky="ew", padx=12, pady=4)
+                row=9, column=0, sticky="ew", padx=12, pady=4)
 
-        tip = ("ℹ  Tip: patterns use Python regex. Leave TARGET blank\n"
-               "to create a new column. Match to an existing column\n"
-               "name (e.g. OPPO) to extend it.")
+        tip = ("ℹ  Tip: Patterns use Python regex by default.\n"
+               "If Plain Text Mode is ON, words are matched exactly.\n"
+               "Leave TARGET blank to create a new column.")
         ctk.CTkLabel(
             right, text=tip, justify="left",
             font=ctk.CTkFont(family="Arial", size=10),
             text_color=C["dim"],
-        ).grid(row=9, column=0, sticky="w", padx=12, pady=(8, 0))
+        ).grid(row=10, column=0, sticky="w", padx=12, pady=(8, 0))
 
         self._refresh_rules_list()
 
@@ -933,6 +1070,15 @@ class DriveDataApp(ctk.CTk):
             return
 
         pats  = [p.strip() for p in raw.splitlines() if p.strip()]
+        
+        # If Plain Text Mode is ON, convert words to a boundary regex pattern
+        if self._plain_text_mode.get():
+            escaped_pats = [re.escape(p) for p in pats]
+            if escaped_pats:
+                # Compile to word boundary regex match e.g. \b(word1|word2)\b
+                combined_pattern = rf"\b({'|'.join(escaped_pats)})\b"
+                pats = [combined_pattern]
+                
         rules = load_custom_rules()
 
         if self._editing_rule is not None:
@@ -953,6 +1099,7 @@ class DriveDataApp(ctk.CTk):
         self._r_name.set("")
         self._r_pats.delete("1.0", "end")
         self._r_tgt.set("")
+        self._plain_text_mode.set(False)
         self._refresh_rules_list()
 
     def _delete_rule(self, rule_data):
@@ -1091,8 +1238,9 @@ class DriveDataApp(ctk.CTk):
                 if records_count is not None:
                     self.after(0, lambda: self._show_popup("JOB DONE", f"{job_name} finished successfully!\nProcessed {records_count} records."))
             except Exception as exc:
-                self.after(0, lambda: self._log(f"❌ Error: {exc}"))
-                self.after(0, lambda: self._show_popup("ERROR", f"An error occurred:\n{exc}"))
+                err_str = str(exc)
+                self.after(0, lambda: self._log(f"❌ Error: {err_str}"))
+                self.after(0, lambda: self._show_popup("ERROR", f"An error occurred:\n{err_str}"))
             finally:
                 self._running = False
                 self.after(0, self._stop_prog)
