@@ -130,12 +130,18 @@ BASE_COLUMNS = [
 # ══════════════════════════════════════════════════════════════════════════════
 
 def load_custom_rules() -> list:
-    if os.path.exists(RULES_FILE):
-        try:
-            with open(RULES_FILE, "r", encoding="utf-8") as fh:
-                return json.load(fh)
-        except Exception:
-            pass
+    if not os.path.exists(RULES_FILE):
+        # Seed default patterns
+        rules = []
+        for name, pats in DEFAULT_PATTERNS.items():
+            rules.append({"name": name, "patterns": pats, "target": name})
+        save_custom_rules(rules)
+        return rules
+    try:
+        with open(RULES_FILE, "r", encoding="utf-8") as fh:
+            return json.load(fh)
+    except Exception:
+        pass
     return []
 
 
@@ -145,8 +151,7 @@ def save_custom_rules(rules: list) -> None:
 
 
 def get_active_patterns() -> dict:
-    """Merge default rules with any saved custom rules."""
-    patterns = {k: list(v) for k, v in DEFAULT_PATTERNS.items()}
+    patterns = {}
     for rule in load_custom_rules():
         name = rule.get("name", "").strip()
         pats = rule.get("patterns", [])
@@ -156,12 +161,15 @@ def get_active_patterns() -> dict:
 
 
 def get_all_columns() -> list:
-    """Return full column list, inserting custom-rule columns before DATE ADDED."""
-    cols = list(BASE_COLUMNS)
+    cols = [
+        "CLIENT NUMBER", "CLIENT NAME", "CASE #", "CASE NAME", "TM NO", "CLASS",
+        "FILES", "EXT"
+    ]
     for rule in load_custom_rules():
         name = rule.get("name", "").strip()
         if name and name not in cols:
-            cols.insert(-1, name)   # before DATE ADDED
+            cols.append(name)
+    cols.append("DATE ADDED")
     return cols
 
 
@@ -759,12 +767,7 @@ class DriveDataApp(ctk.CTk):
             w.destroy()
 
         row = 0
-        # Built-in rules (read-only display)
-        for name, pats in DEFAULT_PATTERNS.items():
-            self._rule_row(name, f"{len(pats)} pattern(s)", row, is_custom=False)
-            row += 1
-
-        # Custom rules
+        # All rules are now custom/editable
         for rule in load_custom_rules():
             n   = rule.get("name", "?")
             p   = rule.get("patterns", [])
