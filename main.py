@@ -379,52 +379,57 @@ def upload_to_sheets(records, log_fn=print):
             end_col = chr(64 + len(hdrs)) if len(hdrs) <= 26 else "A" + chr(64 + len(hdrs) - 26)
             ws.update(values=[hdrs], range_name=f"A1:{end_col}1")
 
-        # Fetch existing sheet content for TM NO lookup
+        # Fetch existing sheet content for deduplication lookup on CASE #
         all_rows = ws.get_all_values()
-        tm_to_row = {}
+        tm_no_idx   = cols.index("TM NO")   if "TM NO"  in cols else 4
+        case_no_idx = cols.index("CASE #")  if "CASE #" in cols else 2
+        date_idx    = cols.index("DATE ADDED") if "DATE ADDED" in cols else len(cols) - 2
+
+        # Build lookup: CASE # → (sheet_row_number, row_data)
+        case_to_row = {}
         if len(all_rows) > 1:
             for idx, r in enumerate(all_rows[1:], start=2):
-                if len(r) > 4:
-                    tm_val = r[4].strip()
-                    if tm_val:
-                        tm_to_row[tm_val] = (idx, r)
+                if len(r) > case_no_idx:
+                    key = r[case_no_idx].strip()
+                    if key:
+                        case_to_row[key] = (idx, r)
 
         updates = []
         appends = []
 
         for r in records:
-            tm_no = r.get("TM NO", "").strip()
+            case_no = r.get("CASE #", "").strip()
             row_data = []
-            for c in cols:
-                if c == "DATE ADDED":
-                    # Preserve original date if row already exists
-                    if tm_no in tm_to_row:
-                        old_row = tm_to_row[tm_no][1]
-                        date_idx = cols.index("DATE ADDED")
-                        if date_idx < len(old_row):
-                            row_data.append(old_row[date_idx])
-                            continue
-                row_data.append(r.get(c, ""))
+            for col_name in cols:
+                if col_name == "DATE ADDED" and case_no in case_to_row:
+                    # Preserve the original DATE ADDED for existing records
+                    old_row = case_to_row[case_no][1]
+                    row_data.append(old_row[date_idx] if date_idx < len(old_row) else r.get(col_name, ""))
+                else:
+                    row_data.append(r.get(col_name, ""))
 
-            if tm_no and tm_no in tm_to_row:
-                row_idx = tm_to_row[tm_no][0]
+            if case_no and case_no in case_to_row:
+                row_idx = case_to_row[case_no][0]
                 col_letter = chr(64 + len(cols)) if len(cols) <= 26 else "A" + chr(64 + len(cols) - 26)
                 updates.append({
-                    'range': f'A{row_idx}:{col_letter}{row_idx}',
-                    'values': [row_data]
+                    "range":  f"A{row_idx}:{col_letter}{row_idx}",
+                    "values": [row_data],
                 })
             else:
                 appends.append(row_data)
 
-        # Apply updates
+        # Apply updates (batch)
         if updates:
             ws.batch_update(updates)
-            log_fn(f"🔄 Updated {len(updates)} existing records (TM NO Lookup)")
+            log_fn(f"🔄 Updated {len(updates)} existing records (CASE # dedup)")
 
-        # Apply appends
+        # Apply new appends
         if appends:
             ws.append_rows(appends)
             log_fn(f"✅ Appended {len(appends)} new records to Google Sheets")
+
+        if not updates and not appends:
+            log_fn("ℹ️  No changes — all records already up-to-date")
 
         # Formatting: Ysabeau SC font, alternate row colors, frozen top row
         try:
