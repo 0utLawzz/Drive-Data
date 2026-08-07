@@ -1204,39 +1204,63 @@ class DriveDataApp(ctk.CTk):
         return True
 
     def _show_popup(self, title, message):
-        # Create popup window styled as Neo-Brutalist
+        POP_W, POP_H = 360, 210
         popup = ctk.CTkToplevel(self)
         popup.title(title)
-        popup.geometry("380x200")
-        popup.configure(fg_color=C["bg"])
+        popup.resizable(False, False)
+        popup.configure(fg_color=C["black"])
         popup.transient(self)
         popup.grab_set()
 
-        popup.update_idletasks()
-        w = popup.winfo_width()
-        h = popup.winfo_height()
-        extra_x = (self.winfo_width() - w) // 2
-        extra_y = (self.winfo_height() - h) // 2
-        popup.geometry(f"+{self.winfo_x() + extra_x}+{self.winfo_y() + extra_y}")
+        # Centre over parent
+        self.update_idletasks()
+        px = self.winfo_x() + (self.winfo_width()  - POP_W) // 2
+        py = self.winfo_y() + (self.winfo_height() - POP_H) // 2
+        popup.geometry(f"{POP_W}x{POP_H}+{px}+{py}")
 
-        # Neo-Brutalist card layout
-        card = _shadow_card(popup, shadow=5, row=0, column=0, sticky="nsew", padx=15, pady=15)
-        card.grid_columnconfigure(0, weight=1)
-        card.grid_rowconfigure(1, weight=1)
         popup.grid_columnconfigure(0, weight=1)
         popup.grid_rowconfigure(0, weight=1)
 
-        _nb_label(card, title.upper(), size=14, weight="bold", color=C["accent"], row=0, column=0, pady=(10, 5))
-
-        lbl_msg = ctk.CTkLabel(
-            card, text=message,
-            font=ctk.CTkFont(family="Arial", size=12, weight="bold"),
-            text_color=C["black"], justify="center", wraplength=300,
-            fg_color="transparent"
+        # Inner card (no extra shadow wrapper — window border acts as border)
+        card = ctk.CTkFrame(
+            popup,
+            fg_color=C["panel"],
+            corner_radius=0,
+            border_width=3,
+            border_color=C["black"],
         )
-        lbl_msg.grid(row=1, column=0, pady=5, padx=20, sticky="ew")
+        card.grid(row=0, column=0, sticky="nsew", padx=4, pady=4)
+        card.grid_columnconfigure(0, weight=1)
+        card.grid_rowconfigure(1, weight=1)
 
-        _nb_btn(card, "OK", popup.destroy, fg=C["black"], tc=C["white"], row=2, column=0, pady=(10, 10), padx=40, sticky="ew")
+        # Title label
+        ctk.CTkLabel(
+            card, text=title.upper(),
+            font=ctk.CTkFont(family="Arial Black", size=14, weight="bold"),
+            text_color=C["accent"],
+        ).grid(row=0, column=0, sticky="ew", padx=16, pady=(14, 4))
+
+        # Message label — wraplength calculated from popup width
+        ctk.CTkLabel(
+            card, text=message,
+            font=ctk.CTkFont(family="Arial", size=12),
+            text_color=C["black"],
+            justify="center",
+            wraplength=POP_W - 48,   # 24px padding each side
+        ).grid(row=1, column=0, sticky="nsew", padx=16, pady=4)
+
+        # OK button — flush width inside card
+        ctk.CTkButton(
+            card, text="OK",
+            height=34,
+            fg_color=C["black"],
+            hover_color=C["teal"],
+            text_color=C["white"],
+            corner_radius=0,
+            border_width=0,
+            font=ctk.CTkFont(family="Arial Black", size=12, weight="bold"),
+            command=popup.destroy,
+        ).grid(row=2, column=0, sticky="ew", padx=16, pady=(8, 16))
 
     def _wrap(self, fn, job_name="Scan Job"):
         def wrapper():
