@@ -1231,9 +1231,10 @@ class DriveDataApp(ctk.CTk):
         lbl_msg = ctk.CTkLabel(
             card, text=message,
             font=ctk.CTkFont(family="Arial", size=12, weight="bold"),
-            text_color=C["black"], justify="center", wraplength=300
+            text_color=C["black"], justify="center", wraplength=300,
+            fg_color="transparent"
         )
-        lbl_msg.grid(row=1, column=0, pady=5, sticky="nsew")
+        lbl_msg.grid(row=1, column=0, pady=5, padx=20, sticky="ew")
 
         _nb_btn(card, "OK", popup.destroy, fg=C["black"], tc=C["white"], row=2, column=0, pady=(10, 10), padx=40, sticky="ew")
 
