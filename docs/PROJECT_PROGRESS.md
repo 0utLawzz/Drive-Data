@@ -401,3 +401,39 @@ production (OI-7 is unaffected and still open).
 2. **Interactive Sheets Column Mapping**: Let users visually drag and drop case folder metadata segments to customize how sheet columns map to folders.
 3. **Regex Validator for Custom Rules**: Validate regex patterns in the GUI before saving to prevent runtime scanning failures.
 4. **Duplicate Record Reporting**: Highlight cases matching duplicate criteria directly in the GUI Status Log panel rather than just exporting duplicates.
+
+---
+
+## Completed Sprint — Sprint 6 Tasks (archived)
+
+*Completed: 2026-08-06 / 2026-08-07*
+
+1. **Login Display System Enhancement** — Polished notification popup with Neo-Brutalist card layout, fixed-width OK button, correct `wraplength` relative to popup width, and `resizable(False, False)` to prevent overflow.
+2. **Google Sheets Formatting** — Alternate row coloring (odd rows cream `#FAF6EE`, even rows white), Ysabeau SC font applied to all data cells, frozen header row.
+3. **CASE # Deduplication** — Changed Google Sheets upload dedup key from TM NO (often empty) to CASE # (always present and unique). Existing rows are now updated in-place; genuinely new records are appended. `DATE ADDED` is preserved on updates; `UPDATED ON` reflects the latest upload timestamp.
+4. **Date Formatting** — Standardized all date outputs to `DD-MMM-YY` (e.g. `06-Aug-26`). Added `UPDATED ON` column.
+5. **Alphabetical Sort** — All scan outputs (Excel, CSV, Sheets) sorted alphabetically by `CLIENT NUMBER` then `CASE #`.
+6. **Plain Text Rule Builder** — Added `PLAIN TEXT MODE (NO REGEX)` checkbox in the Rules Manager. Users type plain words; the app auto-compiles them into a safe `\b(word1|word2)\b` pattern. Eliminates the need for any regex knowledge.
+7. **Invalid Regex Auto-Fix** — Repaired four broken patterns in `custom_rules.json` (`\\opposition`, `\\TM6`, `\\INCORPORATION`, `\\FILING` — all missing opening `\b`). Added `try/except re.error` inside pattern matcher so future bad patterns skip gracefully instead of crashing the scan.
+8. **Tkinter Lambda Scope Bugfix** — Fixed `NameError` in thread wrapper where `exc` was garbage-collected before the lambda callbacks executed. Resolved by converting to `err_str = str(exc)` immediately.
+9. **GitHub v1.0 Release** — Tagged `v1.0.0`, published release notes, and cleared pending commits.
+
+---
+
+### 2026-08-07-A — CASE # chosen as primary deduplication key for Sheets upload
+
+**Date:** 2026-08-07
+**Decision:** Switched Google Sheets dedup key from `TM NO` (column E) to `CASE #` (column C).
+**Reason:** `TM NO` is empty for ~43 % of real Brandex cases (per Sprint 4 data). Using TM NO as the dedup key silently allowed all empty-TM records to be appended every run, creating unbounded duplicates.
+**Consequence:** `CASE #` is always populated and unique per case, making it a reliable upsert key. `TM NO` is still stored in column E and displayed in the sheet — it is just no longer used as the dedup identity key. `DATE ADDED` is preserved for existing rows; only `UPDATED ON` is refreshed on each re-upload.
+
+---
+
+## Suggestions for Future Improvements (Next Steps)
+
+1. **Scan Cache for Cloud Mounts**: Cache scanned directory trees to reduce re-scan latency over Google Drive mounts.
+2. **Interactive Sheets Column Mapping**: Let users drag and drop metadata segments to customize which columns appear in the sheet.
+3. **Regex Validator in GUI**: Validate regex patterns before saving rules to prevent any runtime crash.
+4. **Duplicate Record Reporting**: Surface duplicate CASE # hits directly in the GUI Status Log, not just suppress them silently.
+5. **Promote Parser V2 → `main.py`** (OI-7): V2 is validated and ready; a deliberate cutover decision is still pending.
+
